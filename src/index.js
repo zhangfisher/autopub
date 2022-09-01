@@ -261,13 +261,29 @@ async function publishPackage(){
 function generatePublishReport(){
     const {workspaceRoot,tag,report="versions.md"} = this 
     let reportFile = path.isAbsolute(report) ? report : path.join(workspaceRoot,report)
-    let results = []
-    results.push("# 版本信息")
-    results.push("| 包| 版本号| 最后更新 | 说明|")
-    results.push("| --- | :---: | :---: | --- |")
+    const format = reportFile.endsWith('.json') ? 'json' : 'md'
+    let results = format=='json' ? {} : []
+
+    if(format=='json'){
+
+    }else{
+        results.push("# 版本信息")
+        results.push("| 包| 版本号| 最后更新 | 说明|")
+        results.push("| --- | :---: | :---: | --- |")
+    }
+    
     getPackages.call(this).forEach(package => {
         const lastPublish = package.lastPublish ? longDate(package.lastPublish) : "None"
-        results.push(`|**${package.name}**|${package.version}|${lastPublish}|${package.description}|`)
+        if(format=='json'){
+            results[package.name]= {
+                name       : package.name,                                              // 完整包名，即package.json中的name
+                description: packaged.description,                                       // 包描述
+                version    : packaged.version,
+                lastPublish: packaged.lastPublish
+            }
+        }else{
+            results.push(`|**${package.name}**|${package.version}|${lastPublish}|${package.description}|`)    
+        }        
     })     
     fs.writeFileSync(reportFile, results.join("\n"))
 }
@@ -466,7 +482,7 @@ program
  
 
 program
-     .description("自动发布包到NPM")
+     .description("一健自动发包工具")
      .option("-a, --all", "发布所有包")
      .option("-f, --force", "强制发布包")
      .option("-n, --no-ask", "不询问直接发布")

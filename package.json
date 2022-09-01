@@ -4,11 +4,13 @@
     "description": "Auto publish tool for monorepo",
     "main": "./src/index.js",
     "repository": "https://gitee.com/zhangfisher/autopub.git",
+    "homepage": "https://zhangfisher.github.io/autopub/",
     "bin": {
         "autopub": "./src/index.js"
     },
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "dev:docs":"docsify serve docs"
     },
     "keywords": [],
     "author": "",
