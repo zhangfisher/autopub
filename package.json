@@ -1,0 +1,40 @@
+{
+    "name": "autopub",
+    "version": "1.0.0",
+    "description": "Auto publish tool for monorepo",
+    "main": "./src/index.js",
+    "repository": "https://gitee.com/zhangfisher/autopub.git",
+    "bin": {
+        "autopub": "./src/index.js"
+    },
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "commander": "^9.4.0",
+        "dayjs": "^1.11.5",
+        "enquirer": "^2.3.6",
+        "fast-glob": "^3.2.11",
+        "fs-extra": "^10.1.0",
+        "logsets": "^1.0.14",
+        "shelljs": "^0.8.5"
+    },
+    "devDependencies": {
+        "yalc": "1.0.0-pre.53"
+    },
+    "autopub": {
+        "excludes": [],
+        "publishScript": "release",
+        "report": "versions.md",
+        "changeLogs": "changeLogs",
+        "versionIncStep": "patch"
+    },
+    "files":[
+        "LICENSE",
+        "readme.md",        
+        "src/"
+    ]
+}
