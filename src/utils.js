@@ -140,8 +140,9 @@ function execShellScript(script,options={}){
  * @returns 
  */
 async function asyncExecShellScript(script,options={}){
+    const { silent=true} = this
     return new Promise((resolve,reject)=>{
-        shelljs.exec(script,{...options,async:true},(code,stdout)=>{
+        shelljs.exec(script,{silent,...options,async:true},(code,stdout)=>{
             if(code>0){
                 reject(new Error(`执行<${script}>失败: ${stdout.trim()}`))
             }else{
@@ -226,7 +227,7 @@ function isSameTime(time,baseTime){
  * @param {*} package  {name,folderName,fullpath,}
  */
 async function getPackageReleaseInfo(package) {
-    const { silent } = this
+    const { silent,test } = this
     try{
         let results = await asyncExecShellScript(`npm info ${package.name} --json`,{silent})
         const info = JSON.parse(results)
@@ -234,8 +235,8 @@ async function getPackageReleaseInfo(package) {
             tags        : info["dist-tags"], 
             license     : info["license"], 
             author      : info["author"],
-            createdTime : info.time["created"],
-            modifiedTime: info.time["modified"],
+            firstCreated: info.time["created"],
+            lastPublish : info.time["modified"],
             size        : info.dist["unpackedSize"] 
         }
     }catch(e){
@@ -251,8 +252,8 @@ async function getPackageReleaseInfo(package) {
  * 
  * @param {*} package  {name,folderName,fullpath,modifiedTime} 
  */
-await function packageIsDirty(package){ 
-    return await getPackageCommitCount.call(this,package,package.modifiedTime) > 0
+async function packageIsDirty(package){ 
+    return await getPackageCommitCount.call(this,package,package.lastPublish) > 0
 }
 
 /**
@@ -263,14 +264,15 @@ await function packageIsDirty(package){
  */
 async function getPackageCommitCount(package,relTime){
     const { silent } = this
-    const gitCmd = `git shortlog HEAD ${relTime ? '--after={'+relTime+'}': ''} -s`
+    const gitCmd = `git shortlog HEAD ${relTime ? '--after={'+relTime+'}': ''} -s -- packages/${package.folderName}`
+    let count = 0
     shelljs.cd(package.fullPath)
     try{
         let result = await asyncExecShellScript(gitCmd,{ silent })
-        return result.split("\n").map(v=>parseInt(v)).reduce((prev,cur)=>prev+cur,0)  || 0
-    }catch(e){
-        return 0
-    }    
+        count = result.split("\n").map(v=>parseInt(v)).reduce((prev,cur)=>prev+cur,0)  || 0
+    }catch(e){ }   
+    package.newCommits = count 
+    return count
 }
 /**
  * 切换到指定的分支
@@ -314,6 +316,7 @@ module.exports ={
     isSameTime,
     getPackageReleaseInfo,
     getPackageCommitCount,
+    packageIsDirty,
     checkoutBranch,
     getCurrentBranch
 }

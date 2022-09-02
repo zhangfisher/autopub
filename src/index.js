@@ -28,7 +28,6 @@ const {
     getPackageRootFolder,
     getWorkspaceRootFolder,
     asyncExecShellScript,
-    execShellScriptWithReturns,
     getFolderLastModified,
     getFileLastModified,
     isAfterTime,
@@ -37,7 +36,8 @@ const {
     shortDate,
     longDate,
     getPackageReleaseInfo,
-    getPackageCommitsCountOnAfterTime,
+    getPackageCommitCount,
+    packageIsDirty,
     checkoutBranch,
     getCurrentBranch
  } = require("./utils");
@@ -91,7 +91,7 @@ function getPackages(){
     const {excludes,workspaceRoot,workspace} = this
      // 1.读取所有包信息
      let packages = fs.readdirSync(path.join(workspaceRoot,"packages"))
-                        .map(packageFolder=>getPackage(packageFolder))
+                        .map(packageFolder=>getPackage.call(this,packageFolder))
                         .filter(pkgInfo=>pkgInfo && !excludes.includes(pkgInfo.value))
      // 2.根据依赖关系进行排序： 不处理循环依赖关系
      for(let i=0;i<packages.length;i++){
@@ -145,13 +145,18 @@ async function runPackageReleaseScript(package){
 /**
  * 切换到发布分支
  */
-function checkoutToReleaseBranch(){    
+function switchToReleaseBranch(){    
     let { releaseBranch } = this
-    let oldBranch,isCheckout = false    
-    try{
-        logger.log("- 切换到发布分支: {}",releaseBranch || '<当前分支>')
-        let oldBranch = getCurrentBranch()
-        if(releaseBranch && releaseBranch!=oldBranch){
+    let currentBranch,isCheckout = false    
+    try{        
+        currentBranch = getCurrentBranch()
+        logger.log("- 当前分支: {}",currentBranch)
+        logger.log("- 发布分支: {}",releaseBranch || currentBranch)
+        if(releaseBranch != currentBranch){
+            logger.log("- 切换到发布分支: {}",releaseBranch)
+        }
+        // 切换到发布分支
+        if(releaseBranch && releaseBranch!=currentBranch){
             checkoutBranch(releaseBranch)
             isCheckout = true
         }             
@@ -159,7 +164,7 @@ function checkoutToReleaseBranch(){
         throw e
     }finally{
         if(isCheckout){
-            this.oldBranch = oldBranch   // 记录下曾经切换到的分支，以便恢复
+            this.oldBranch = currentBranch   // 记录下曾经切换到的分支，以便恢复
         }
     }
 }
@@ -181,7 +186,7 @@ async function readPackages(packages){
             Object.assign(package,releaseInfo)
             // 2. 检查当前包自上次发布以来是否有提交
             package.isDirty = await packageIsDirty.call(this,package)             
-            tasks.complete()          
+            tasks.complete(`${shortDate(package.lastPublish)}(V${package.version})`)          
         }catch(e){
             tasks.error(`${e.message}`)
         }
@@ -194,12 +199,12 @@ async function readPackages(packages){
  */
 async function publishAllPackages(packages){
     const { workspaceRoot,force,log } = this    
-
+    // 1. 读取包信息
     readPackages.call(this,packages)
 
-    logger.log("- 开始发布包：")
+    logger.log("- 开始发布包：")    
     const tasks = logger.tasklist()
-    // 依次对每个包进行发布
+    // 2. 依次发布每个包
     for(let package of packages){
         tasks.add(`发布包[${package.name}]`)
         try{
@@ -216,23 +221,6 @@ async function publishAllPackages(packages){
 }
 
 /**
- * runTask(()=>{},{
- *  title:`递增版本号:(${versionIncStep}+)`,
- *  complete
- * })
- * @param {*} tasks 
- * @param {*} fn 
- */
-async function runTask(fn,title){
-    tasks.add(title)
-    try{
-        await fn()
-    }catch(e){
-        tasks.error(e.message)
-    }
-}
-
-/**
  * 发布指定的包
  * 
  *  - 
@@ -243,7 +231,7 @@ async function runTask(fn,title){
  * @param {*} options 
  */
 async function publishPackage(){
-    const {workspaceRoot,distTag, test,buildScript,versionIncStep, silent,package:currentPackage} = this    
+    const {workspaceRoot,distTag,pnpmPublishOptions={}, build,test,buildScript,versionIncStep, silent,package:currentPackage} = this    
     // 1. 切换到包所在目录
     const packageFolder = currentPackage ? path.join(workspaceRoot,"packages",currentPackage) : getPackageRootFolder()
     const pkgFile = path.join(packageFolder, "package.json")
@@ -262,16 +250,16 @@ async function publishPackage(){
     const tasks = logger.tasklist()
     try{
         //  第1步： 更新版本号和发布时间
-        tasks.add(`增加版本号(${versionIncStep}+)`) 
+        tasks.add(`自增版本号(${versionIncStep}++)`) 
         await asyncExecShellScript.call(this,`npm version ${versionIncStep}`,{silent})              
         packageInfo = getPackageJson(packageFolder) // 重新读取包数据以得到更改后的版本号    
         packageBackup = Object.assign({},packageInfo)
         tasks.complete(`${oldVersion}->${packageInfo.version}`)   
 
         // 第二步：构建包：发布前进行自动构建
-        if(buildScript in packageInfo.scripts){
+        if(build && buildScript in packageInfo.scripts){
             tasks.add("构建包")
-            await asyncExecShellScript.call(this,`pnpm {buildScript}`,{silent})
+            await asyncExecShellScript.call(this,`pnpm ${buildScript}`,{silent})
             tasks.complete()
         }      
 
@@ -281,7 +269,8 @@ async function publishPackage(){
         tasks.add("发布包")
         let opts = [
             "--no-git-checks",
-            "--access public"
+            "--access public",
+            ...pnpmPublishOptions
         ]
         if(distTag) opts.push(`--tag ${distTag}`)
         if(test) opts.push("--dry-run")
@@ -302,7 +291,7 @@ async function publishPackage(){
 
 // 生成包版本列表文件到文档中
 function generatePublishReport(){
-    const {workspaceRoot,tag,report="versions.md"} = this 
+    const {workspaceRoot,distTag,report="versions.md"} = this 
     let reportFile = path.isAbsolute(report) ? report : path.join(workspaceRoot,report)
     const format = reportFile.endsWith('.json') ? 'json' : 'md'
     let results = format=='json' ? {} : []
@@ -320,9 +309,9 @@ function generatePublishReport(){
         if(format=='json'){
             results[package.name]= {
                 name       : package.name,                                              // 完整包名，即package.json中的name
-                description: packaged.description,                                       // 包描述
-                version    : packaged.version,
-                lastPublish: packaged.lastPublish
+                description: package.description,                                       // 包描述
+                version    : package.version,
+                lastPublish: package.lastPublish
             }
         }else{
             results.push(`|**${package.name}**|${package.version}|${lastPublish}|${package.description}|`)    
@@ -338,7 +327,7 @@ function generatePublishReport(){
  * @returns   {selectedPackages,distTag,versionIncStep }
  */
 async function askForPublishPackages(packages,options){
-    const { workspaceRoot,versionIncStep } = this
+    let  { workspaceRoot,versionIncStep:curVerIncStep } = this
     let selectedCount = 0;
     let packageChoices = packages.map(package => {
         const lastPublish    = package.lastPublish ? shortDate(package.lastPublish) : "None"
@@ -370,7 +359,7 @@ async function askForPublishPackages(packages,options){
             name   : 'versionIncStep',
             message: '选择版本号递增方式：',
             choices: VERSION_STEPS,
-            initial: VERSION_STEPS.indexOf(versionIncStep),
+            initial: VERSION_STEPS.indexOf(curVerIncStep),
             skip   : () => selectedCount === 0
         }, 
         {
@@ -383,7 +372,14 @@ async function askForPublishPackages(packages,options){
             skip   : () => selectedCount === 0
         } 
     ]; 
-    return await prompt(questions); 
+    const {selectedPackages,distTag,versionIncStep} = await prompt(questions);
+    
+    let context  = this
+    if(selectedPackages!='auto'){
+        context.packages = selectedPackages
+    }  
+    context.distTag        = distTag 
+    context.versionIncStep = versionIncStep
 }
 
 /**
@@ -401,48 +397,47 @@ function getWorkspaceContext(options) {
     // 2. 生成默认的工作区相关信息
     return {
         workspaceRoot,                           // 工作区根路径
-        excludes      : [],                      // 要排除发布的包名称
-        lastPublish   : null,                    // 最后发布的时间
-        buildScript   : "build",                 // 发布前执行构建的脚本
-        releaseScript : "release",               // 发布命令，当发布所有包时会调用pnpm release,您也可以指定其他名称
-        report        : "versions.md",           // 发布报告信息,支持md和json两种格式
-        changeLogs    : "changeLogs",            // 发布变更日志
-        versionIncStep: "patch",                  // 默认版本增长方式
-        silent        : true,                    // 静默发布，不提示信息
-        workspace     : workspaceInfo,           // 工作区根文件夹
-        distTag       : null,                    // 发布标签 
-        dryRun        : false,                   // 模拟发布   
-        releaseBranch : null,                    // 发布分支，未指定时采用当前分支
-        force         : false,                   // 强制发布包    
-        packages      : null,                    // packages包
-        logEnable     : 0,                       // 生成发布日志
+        excludes          : [],                      // 要排除发布的包名称
+        lastPublish       : null,                    // 最后发布的时间
+        buildScript       : "build",                 // 发布前执行构建的脚本
+        releaseScript     : "release",               // 发布命令,当发布所有包时会调用
+        report            : "versions.md",           // 发布报告信息,支持md和json两种格式
+        changeLogs        : "changeLogs",            // 发布变更日志
+        versionIncStep    : "patch",                 // 默认版本增长方式
+        silent            : true,                    // 静默发布，不提示信息
+        workspace         : workspaceInfo,           // 工作区根文件夹
+        distTag           : null,                    // 发布标签 
+        test              : false,                   // 模拟发布   
+        releaseBranch     : null,                    // 发布分支，未指定时采用当前分支
+        force             : false,                   // 强制发布包
+        pnpmPublishOptions: {},                //
+        packages          : null,                    // packages包
+        logs              : [],                       // 发包日志，后续会保存到autopub.log
+        log               : function(info){this.logs.push(info)},
         ...workspaceInfo.autopub || {},          // 配置参数
         ...options,
-        logs          : [],                       // 发包日志，后续会保存到autopub.log
-        log           :  function(info){this.logs.push(info)}
     }        
 }
 
 program
     .command("list")
     .description("列出当前工作区的所有包")
-    .action(options => {
+    .action(async (options) => {
         const context = getWorkspaceContext(options)
         const { workspaceRoot } = context
         const table = logger.table({grid:1})
-        table.addHeader("包名","版本号","最后提交时间","最后修改时间")
-        getPackages.call(context).forEach(package => {
+        table.addHeader("包名","版本号","最近发布","自上次至今提交数")        
+        context.packages = getPackages.call(context)
+        await readPackages.call(context, context.packages)
+        for(let package of context.packages){
             const lastPublish    = package.lastPublish ? shortDate(package.lastPublish) : "None"
             const lastPublishRef = package.lastPublish ? `(${relativeTime(package.lastPublish)})` : ""
-            const lastModified   = getFolderLastModified(path.join(workspaceRoot,"packages",package.folderName))
-            const lastUpdate     = shortDate(lastModified)                    
-            const lastUpdateRef  = relativeTime(lastModified)   
             if(package.lastPublish){
-                table.addRow(package.name,package.version,`${lastPublish}(${lastPublishRef})`,`${lastUpdate}(${lastUpdateRef})`)
+                table.addRow(package.name,package.version,`${lastPublish}(${lastPublishRef})`,package.newCommits)
             }else{
-                table.addRow(package.name,package.version,"None",`${lastUpdate}(${lastUpdateRef})`)
+                table.addRow(package.name,package.version,"None",package.newCommits)
             }
-        })
+        } 
         table.render()
     })
  
@@ -460,9 +455,9 @@ program
             tasks.add(`packages/${package.name}`)
             try{
                 const packageFolder = path.join(workspaceRoot,"packages",package.folderName) 
-                const pkgFile = path.join(packageFolder, "package.json")
-                let packageData  = getPackageJson(packageFolder)
-                const releaseScript =  "pnpm autopub"
+                const pkgFile       = path.join(packageFolder, "package.json")
+                let packageData     = getPackageJson(packageFolder)
+                const releaseScript = "pnpm autopub"
                 if(packageData){
                     if(!packageData.scripts) packageData.scripts = {}
                     if(options.releaseScript in packageData.scripts){
@@ -532,6 +527,7 @@ program
      .option("-p, --package [name]", "指定要发布的包名称")
      .option("-s, --no-silent", "静默显示脚本输出")
      .option("--test", "模拟发布")
+     .option("--no-build", "发布前不执行Build脚本")
      .option("-b, --release-branch", "发布Git分支")     
      .option("-e, --excludes [...name]", "排除不发布的包列表",[])
      .option("--auto-git-tag", "发布成功后添加Git tag")
@@ -539,24 +535,15 @@ program
      .addOption(new Option('-i, --version-increment-step [value]', '版本增长方式').default("patch").choices(VERSION_STEPS))
      .action(async (options) => {              
         let context = getWorkspaceContext(options)
-        context.log(`--------Context---------\n${JSON.stringify(context,null,4)}\n------------------------`)
         // 切换到发布分支
-        checkoutToReleaseBranch.call(this)
+        switchToReleaseBranch.call(this)
         if(options.all){  // 自动发布所有包
-            let packages =  getPackages.call(context)
+            context.packages =  getPackages.call(context)
             if(options.ask){
-                let { selectedPackages, distTag, versionIncStep } = await askForPublishPackages.call(context,packages)
-                if(selectedPackages!='auto'){
-                    packages = selectedPackages
-                    if(selectedPackages.length ==0 ) return
-                    context.packages = packages
-                }  
-                context.packages       = packages              
-                context.distTag        = distTag 
-                context.versionIncStep = versionIncStep
+                await askForPublishPackages.call(context,packages)                
             }
-            if(packages.length > 0){
-               await publishAllPackages.call(context,packages,options)
+            if(context.packages.length > 0){
+               await publishAllPackages.call(context,context.packages)
             }
         }else{// 只发布指定的包
             await publishPackage.call(context)
