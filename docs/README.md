@@ -1,12 +1,14 @@
 # 概述
 
-`AutoPub`是一个`pnpm/monorepo`QQ问你工程的一健自动发包工具。
+!> 测试阶段，请[issue](https://gitee.com/zhangfisher/autopub/issues)
+
+`AutoPub`是一个让你爽到起飞的`pnpm/monorepo`工程一健自动发包工具。
 
 本工具是在开发[VoerkaI18n](https://zhangfisher.github.io/voerka-i18n/)解决方案（非常不错的多语言解决方案）时的副产品，`voerkai18n`是一个标准的`monorepo`工程，包含了`@voerkai18n/cli`、`@voerkai18n/runtime`、`@voerkai18n/utils`、`@voerkai18n/vue`、`@voerkai18n/vite`、`@voerkai18n/babel`、`@voerkai18n/react`、`@voerkai18n/formatters`等多个包，发布包时容易引起混乱问题，主要问题：
 
 - 经常忘记哪个包最近什么时间修改，哪个包应该发布，没办法，记性不好。
-- 由于包之间存在依赖关系，需要按一定的顺序进行发布
-- 使用`git hooks`来进行自动发布不能满足要求，因为并不是每一次提交均需要发包.
+- 由于包之间存在依赖关系，需要按一定的顺序进行发布 
+- 版本号要能自动递增
 
 `AutoPub`可以自动一键发布自最近一次发包以来有修改过的包，整个发包过程可以实现全自动。
  
@@ -14,7 +16,7 @@
 
 # 快速入门
 
-**注意：**本工具在`pnpm/monorepo`环境下测试通过，不适用于`lerna/yarn`等`monorepo`工程。
+!> 本工具在`pnpm/monorepo`环境下测试通过，不适用于`lerna/yarn`等`monorepo`工程。
 
 ## 第一步：安装
 
@@ -44,22 +46,12 @@
         "publish:all":"pnpm autopub --all",  
         "publish:[包名称]":"pnpm autopub --package [包名称]",    
         "publish:[包名称]":"pnpm autopub --package [包名称]",    
+        ......
     }
 }
 
 ``` 
-
-| 命令 |  说明 |
-| :---: | ---- |
-| `publish:mock` | 用来模拟发布，也就是调用了`pnpm publish --dry-run`,执行完整的发包流程，但是没有实际发布到`NPM Registry`。|
-| `publish:auto` | 全程自动化发包，一键发布自最近一次发包以来有修改过的包,不需要人工介入,平时主要使用该命令 |
-| `publish:all` | 交互式发布，可以交互选择要发布的包等参数 |
-| `publish:[包名称]` | 每个包对应一个单独发布包的命令 |
- 
-
-
-**注：**
-`publish:mock`、`publish:auto`、`publish:all`仅是默认注入的发包命令，您也可以自己根据`autopub`命令行参数自己编写发包命令，比如编写`publish:beta`之类发布带有`distTag`的包，参见后面命令行参数介绍。
+!>  `publish:mock`、`publish:auto`、`publish:all`仅是默认注入的发包命令，您也可以自己根据`autopub`命令行参数自己编写发包命令，比如编写`publish:beta`之类发布带有`distTag`的包，参见后面命令行参数介绍。
      
 
 - **`autopub init`命令在当前工作区`packages`下的所有包的`package.json`注入脚本**
@@ -115,6 +107,8 @@
 > pnpm publish:cli
 > pnpm publish:runtime
 ```
+
+**说明：*单独发布包好象不能体现出`AutoPub`优势,这仅仅是整个过程自动化发包流程中的一环而已。
 
 # 指南
 

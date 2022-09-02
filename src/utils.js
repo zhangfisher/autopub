@@ -118,8 +118,8 @@ function readPackages(rootFolder){
 function assertInPackageRoot(){
    const currentFolder = process.cwd()
    const workspaceRoot = path.join(currentFolder,"../../")
-   if(!(isPackageRoot(currentFolder) && isWorkspaceRoot(workspaceRoot))){ 
-       throw new Error("命令只能在工作区的包目录下执行")
+   if(!isPackageRoot(currentFolder)){ 
+       throw new Error("命令只能在包目录下执行")
    }
 }
  
@@ -145,7 +145,7 @@ async function asyncExecShellScript(script,options={}){
             if(code>0){
                 reject(new Error(`执行<${script}>失败: ${stdout.trim()}`))
             }else{
-                resolve()
+                resolve(stdout.trim())
             }
         })   
     }) 
@@ -219,6 +219,80 @@ function isSameTime(time,baseTime){
     return dayjs(time).isSame(dayjs(baseTime))
 } 
  
+
+
+/**
+ * 从NPM获取包最近发布的版本信息
+ * @param {*} package  {name,folderName,fullpath,}
+ */
+async function getPackageReleaseInfo(package) {
+    const { silent } = this
+    try{
+        let results = await asyncExecShellScript(`npm info ${package.name} --json`,{silent})
+        const info = JSON.parse(results)
+        return {
+            tags        : info["dist-tags"], 
+            license     : info["license"], 
+            author      : info["author"],
+            createdTime : info.time["created"],
+            modifiedTime: info.time["modified"],
+            size        : info.dist["unpackedSize"] 
+        }
+    }catch(e){
+        return null;        
+    }    
+}
+
+/**
+ * 
+ * 判断自relTime时间项目是否已经有改变
+ * 
+ * 判断提交次数，如果大于0说明有改变
+ * 
+ * @param {*} package  {name,folderName,fullpath,modifiedTime} 
+ */
+await function packageIsDirty(package){ 
+    return await getPackageCommitCount.call(this,package,package.modifiedTime) > 0
+}
+
+/**
+ * 返回自relTime以来提交的次数
+ * @param {*} package   {name,folderName,fullpath,}
+ * @param {*} relTime 标准时间格式
+ * @returns 
+ */
+async function getPackageCommitCount(package,relTime){
+    const { silent } = this
+    const gitCmd = `git shortlog HEAD ${relTime ? '--after={'+relTime+'}': ''} -s`
+    shelljs.cd(package.fullPath)
+    try{
+        let result = await asyncExecShellScript(gitCmd,{ silent })
+        return result.split("\n").map(v=>parseInt(v)).reduce((prev,cur)=>prev+cur,0)  || 0
+    }catch(e){
+        return 0
+    }    
+}
+/**
+ * 切换到指定的分支
+ */
+ async function checkoutBranch(name){
+    try{
+        const result = await asyncExecShellScript(`git checkout ${name}`,{silent:true})
+        const current = getCurrentBranch()
+        if(current!=name) throw new Error(`切换到${name}分支失败`)
+    }catch(e){
+        throw new Error(`切换到<${name}>分支失败`)
+    }    
+}
+
+/**
+ * 获取当前分支名称
+ * @returns 
+ */
+function getCurrentBranch(){
+    return  execShellScriptWithReturns("git branch",{silent:true}).split("\n").filter(name=>name.trim().startsWith("*"))[0].replace("*","").trim()
+}
+
 module.exports ={
     assertInWorkspaceRoot,
     assertInPackageRoot,           
@@ -237,5 +311,9 @@ module.exports ={
     longDate,
     relativeTime,
     isAfterTime,
-    isSameTime 
+    isSameTime,
+    getPackageReleaseInfo,
+    getPackageCommitCount,
+    checkoutBranch,
+    getCurrentBranch
 }

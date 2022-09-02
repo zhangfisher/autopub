@@ -32,7 +32,8 @@
         "publishScript": "release",
         "report": "versions.md",
         "changeLogs": "changeLogs",
-        "versionIncStep": "patch"
+        "versionIncStep": "patch",
+        "branch":"master"
     },
     "files":[
         "LICENSE",

@@ -9,14 +9,24 @@
   <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
 </head>
 <body>
-    <nav>
-        <a href="https://zhangfisher.github.io/voerka-i18n/" target="_blank">VoerkaI18n</a>
-    </nav>
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "https://hm.baidu.com/hm.js?60ab8a656b9c97ea3f3b69b8092ab0f0";
+            var s = document.getElementsByTagName("script")[0]; 
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>        
   <div id="app"></div>
   <script>
     window.$docsify = {
-      name: 'AutoPub',
-      repo: 'https://github.com/zhangfisher'
+      name        : 'AutoPub',
+      loadNavbar  : true,
+      repo        : 'https://github.com/zhangfisher/autopub',
+      relativePath: true,
+      coverpage   : true,
+      onlyCover   : true
     }
   </script>
   <!-- Docsify v4 -->
