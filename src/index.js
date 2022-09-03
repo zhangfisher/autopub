@@ -17,12 +17,13 @@
  * 
  */
  
-const fs                 = require("fs-extra");
-const { prompt }         = require("enquirer");
-const path               = require("path");
-const shelljs            = require("shelljs");
-const createLogger       = require("logsets"); 
-const { Command ,Option} = require('commander');
+const fs                      = require("fs-extra");
+const { prompt }              = require("enquirer");
+const path                    = require("path");
+const shelljs                 = require("shelljs");
+const createLogger            = require("logsets"); 
+const { Command ,Option}      = require('commander');
+const { getWorkspaceContext } = require('./context')
 const { 
     getPackageJson,
     getPackageRootFolder,
@@ -35,14 +36,9 @@ const {
     relativeTime,
     shortDate,
     longDate,
-    getPackageReleaseInfo,
-    getPackageCommitCount,
-    packageIsDirty,
     checkoutBranch,
     getCurrentBranch
- } = require("./utils");
-const { start } = require("repl");
-
+ } = require("./utils"); 
 
 
 const logger = createLogger(); 
@@ -50,72 +46,6 @@ const logger = createLogger();
 const VERSION_STEPS = ["major", "minor", "patch","premajor","preminor","prepatch","prerelease"]
 
 const program =new Command()
- 
-/**
- * 获取指定包信息
- */
-function getPackage(packageFolderName){
-    const {excludes,workspaceRoot,workspace} = this
-    const packageFolder = path.join(workspaceRoot,"packages",packageFolderName)
-    const pkgFile       = path.join(workspaceRoot,"packages",packageFolderName,"package.json")
-    if(!fs.existsSync(pkgFile)) return 
-    const packageInfo = getPackageJson(pkgFile)
-    if(packageInfo){
-        const { name, scripts,version,description,dependencies={},devDependencies={},peerDependencies={},optionalDependencies={} } = packageInfo
-        // 读取当前包对工作区其他包的依赖列表
-        let packageDependencies =[]
-        // 如果包存在对工作区其他包的引用
-        Object.entries({...dependencies,...devDependencies,...peerDependencies,...optionalDependencies}).forEach(([name,version])=>{
-            if(version.startsWith("workspace:") && !excludes.includes(name.replace(`@${workspace.name}/`,""))){
-                packageDependencies.push(name)
-            }
-        })
-        return {
-            name,                                              // 完整包名，即package.json中的name
-            description,                                       // 包描述
-            version,
-            scripts,                                           //  
-            folderName  : packageFolderName,                   // 文件夹名称，可能与package.json中的name相同，也可能不同
-            fullPath    : packageFolder,                       // 完整路径
-            dependencies: packageDependencies                  // 依赖的工作区包
-        }
-    }
-}
-
-/**
- * 获取当前工作区所有包信息
- * @param {Array} excludes  要排除的包
- * @returns 
- */
-function getPackages(){     
-    const {excludes,workspaceRoot,workspace} = this
-     // 1.读取所有包信息
-     let packages = fs.readdirSync(path.join(workspaceRoot,"packages"))
-                        .map(packageFolder=>getPackage.call(this,packageFolder))
-                        .filter(pkgInfo=>pkgInfo && !excludes.includes(pkgInfo.value))
-     // 2.根据依赖关系进行排序： 不处理循环依赖关系
-     for(let i=0;i<packages.length;i++){
-            for(let j=i;j<packages.length;j++){
-                let pkgInfo2 = packages[j]
-                if( packages[i].dependencies.includes(pkgInfo2.name)){
-                    let p = packages[i]
-                    packages[i] = packages[j] 
-                    packages[j] = p
-                }
-            }
-     }
-     // 3. 如果某个包isDirty=true，则依赖于其的其他包也isDirty=true
-    //  packages.forEach(package => {
-    //     if(package.isDirty){
-    //         packages.forEach(p=>{
-    //             if(p.name!==package.name && p.dependencies.includes(package.name)){
-    //                 p.isDirty = true
-    //             }
-    //         })
-    //     }
-    //  })
-     return packages
- }
  
 
 /**
@@ -125,7 +55,7 @@ function getPackages(){
         description,                                       // 包描述
         scripts,
         version,
-        folderName,                                         // 文件夹名称，一般与package.json中的name相同
+        dirName,                                         // 文件夹名称，一般与package.json中的name相同
         fullPath,                                           // 完整路径
         dependencies                                        // 依赖的工作区包
  *  }  
@@ -169,29 +99,6 @@ function switchToReleaseBranch(){
     }
 }
 
-/**
- * 
- * 根据包信息依赖关系进行对要发布的包进行排序
- * 
- */
-async function readPackages(packages){
-    const tasks = logger.tasklist() 
-    logger.log("- 读取包信息：")
-    for(let package of packages){
-        tasks.add(`读取包[${package.name}]`)
-        try{
-            // 1. 从NPM上读取已发布的包信息
-            let releaseInfo = await getPackageReleaseInfo.call(this,package)
-            // 将包发布相关信息合并到包中
-            Object.assign(package,releaseInfo)
-            // 2. 检查当前包自上次发布以来是否有提交
-            package.isDirty = await packageIsDirty.call(this,package)             
-            tasks.complete(`${shortDate(package.lastPublish)}(V${package.version})`)          
-        }catch(e){
-            tasks.error(`${e.message}`)
-        }
-    }
-}
 
 /**
  * 发布所有包
@@ -277,7 +184,11 @@ async function publishPackage(){
         await asyncExecShellScript.call(this,`pnpm publish --no-git-checks ${opts.join(" ")}`,{silent})            
         tasks.complete()   
 
-        // 第四步：增加git tags
+        // 第四步：更新发布时间
+        tasks.add("更新发布时间")
+        packageInfo.lastPublish = dayjs().format()
+        fs.writeFileSync(pkgFile,JSON.stringify(packageInfo,null,4))
+        tasks.complete()
 
     }catch(e){// 如果发布失败，则还原package.json        
         fs.writeFileSync(pkgFile,JSON.stringify(packageBackup,null,4))
@@ -332,7 +243,7 @@ async function askForPublishPackages(packages,options){
     let packageChoices = packages.map(package => {
         const lastPublish    = package.lastPublish ? shortDate(package.lastPublish) : "None"
         const lastPublishRef = package.lastPublish ? `(${relativeTime(package.lastPublish)})` : ""
-        const lastModified   = getFolderLastModified(path.join(workspaceRoot,"packages",package.folderName))
+        const lastModified   = getFolderLastModified(path.join(workspaceRoot,"packages",package.dirName))
         const lastUpdate     = shortDate(lastModified)                  
         const lastUpdateRef  = relativeTime(lastModified)
         return {
@@ -382,142 +293,12 @@ async function askForPublishPackages(packages,options){
     context.versionIncStep = versionIncStep
 }
 
-/**
- * 读取当前工作区和包信息，该信息将作为this传递给所有相关函数，以便可以获取到共享信息
- * @param {*} options          // 命令行参数
- */
-function getWorkspaceContext(options) {
-    // 1. 获取当前工作区根路径
-    const workspaceRoot =  getWorkspaceRootFolder()
-    if(!workspaceRoot) {
-        logger.log("命令只能在PNPM工作区内执行,未发现PNPM工作区")
-        process.exit(0)
-    }
-    const workspaceInfo = getPackageJson(workspaceRoot)
-    // 2. 生成默认的工作区相关信息
-    return {
-        workspaceRoot,                           // 工作区根路径
-        excludes          : [],                      // 要排除发布的包名称
-        lastPublish       : null,                    // 最后发布的时间
-        buildScript       : "build",                 // 发布前执行构建的脚本
-        releaseScript     : "release",               // 发布命令,当发布所有包时会调用
-        report            : "versions.md",           // 发布报告信息,支持md和json两种格式
-        changeLogs        : "changeLogs",            // 发布变更日志
-        versionIncStep    : "patch",                 // 默认版本增长方式
-        silent            : true,                    // 静默发布，不提示信息
-        workspace         : workspaceInfo,           // 工作区根文件夹
-        distTag           : null,                    // 发布标签 
-        test              : false,                   // 模拟发布   
-        releaseBranch     : null,                    // 发布分支，未指定时采用当前分支
-        force             : false,                   // 强制发布包
-        pnpmPublishOptions: {},                //
-        packages          : null,                    // packages包
-        logs              : [],                       // 发包日志，后续会保存到autopub.log
-        log               : function(info){this.logs.push(info)},
-        ...workspaceInfo.autopub || {},          // 配置参数
-        ...options,
-    }        
-}
+
 
 program
-    .command("list")
-    .description("列出当前工作区的所有包")
-    .action(async (options) => {
-        const context = getWorkspaceContext(options)
-        const { workspaceRoot } = context
-        const table = logger.table({grid:1})
-        table.addHeader("包名","版本号","最近发布","自上次至今提交数")        
-        context.packages = getPackages.call(context)
-        await readPackages.call(context, context.packages)
-        for(let package of context.packages){
-            const lastPublish    = package.lastPublish ? shortDate(package.lastPublish) : "None"
-            const lastPublishRef = package.lastPublish ? `(${relativeTime(package.lastPublish)})` : ""
-            if(package.lastPublish){
-                table.addRow(package.name,package.version,`${lastPublish}(${lastPublishRef})`,package.newCommits)
-            }else{
-                table.addRow(package.name,package.version,"None",package.newCommits)
-            }
-        } 
-        table.render()
-    })
- 
-program
-    .command("init")
-    .description("注入必要的发包脚本命令")
-    .option("-e, --excludes [...name]", "排除不发布的包列表",[])
-    .option("-s, --release-script <name>", "包发布脚本名称","release")
-    .action(options => {
-        const { workspaceRoot } = context = getWorkspaceContext(options)
-        logger.log(" - 注入发布脚本")
-        const tasks = logger.tasklist()
-        const packages  = getPackages.call(context)
-        packages.forEach(package => {
-            tasks.add(`packages/${package.name}`)
-            try{
-                const packageFolder = path.join(workspaceRoot,"packages",package.folderName) 
-                const pkgFile       = path.join(packageFolder, "package.json")
-                let packageData     = getPackageJson(packageFolder)
-                const releaseScript = "pnpm autopub"
-                if(packageData){
-                    if(!packageData.scripts) packageData.scripts = {}
-                    if(options.releaseScript in packageData.scripts){
-                        let oldScript = String(packageData.scripts[options.releaseScript])
-                        if(!oldScript.includes(releaseScript)){
-                            if(oldScript.trim()!="") oldScript = oldScript + " && "
-                        }
-                        oldScript = oldScript + releaseScript
-                    }else{
-                        packageData.scripts[options.releaseScript] = releaseScript
-                    }
-                }
-                fs.writeJSONSync(pkgFile,packageData,{spaces:4})
-                tasks.complete()
-            }catch(e){
-                tasks.error(e.message)
-            }            
-        })
-
-        // 2. 注入工作区配置
-        try{
-            tasks.add("<Workspace>")
-            const workspacePkgFile = path.join(workspaceRoot,"package.json")
-            let workspacePkgData = fs.readJSONSync(workspacePkgFile)
-            if(!("autopub" in workspacePkgData)){
-                workspacePkgData["autopub"] = {
-                    excludes      : [],                      // 要排除发布的包名称
-                    releaseScript : "release",               // 发布命令，当发布所有包时会调用pnpm release,您也可以指定其他名称
-                    report        : "versions.md",           // 发布报告信息,支持md和json两种格式
-                    changeLogs    : "changeLogs",            // 发布变更日志
-                    releaseBranch : null,                    // 发布分支，不指定时采用当前分支
-                    versionIncStep: "patch",                 // 默认版本增长方式
-                    ...options
-                }                
-            }            
-            const scripts = {
-                "publish:test" : "pnpm autopub --all --no-ask --test",
-                "publish:auto" : "pnpm autopub --all --no-ask",
-                "publish:all"  : "pnpm autopub --all"
-            }
-            Object.entries(scripts).forEach(([name, script]) => {
-                workspacePkgData.scripts[name] = script
-            }) 
-            packages.forEach(({name}) => {
-                workspacePkgData.scripts[`publish:${name}`] = `pnpm autopub --package ${name}`
-            }) 
-            fs.writeJSONSync(workspacePkgFile,workspacePkgData,{spaces:4})
-            tasks.complete()
-        }catch(e){
-            tasks.error(e.message)
-        }
-
-        logger.log("- 使用方法：")
-        logger.log("\t测试发布： {}","pnpm publish:test" )
-        logger.log("\t自动发布： {}","pnpm publish:auto" )
-        logger.log("\t交互发布： {}","pnpm publish:all" )
-
-    })
- 
-
+    .command("init","注入必要的发包脚本命令",{executableFile: "./init.command.js"})
+    .command("list","列出当前工作区的包",{executableFile: "./list.command.js"})
+    .command("sync","同步本地与NPM的包信息",{executableFile: "./sync.command.js"})
 
 program
      .description("一健自动发包工具")
@@ -538,7 +319,7 @@ program
         // 切换到发布分支
         switchToReleaseBranch.call(this)
         if(options.all){  // 自动发布所有包
-            context.packages =  getPackages.call(context)
+            context.packages =await  getPackages.call(context)
             if(options.ask){
                 await askForPublishPackages.call(context,packages)                
             }

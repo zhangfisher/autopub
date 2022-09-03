@@ -1,6 +1,6 @@
 # 概述
 
-!> 测试阶段，请[issue](https://gitee.com/zhangfisher/autopub/issues)
+!> 测试阶段，谨慎入坑！！！
 
 `AutoPub`是一个让你爽到起飞的`pnpm/monorepo`工程一健自动发包工具。
 

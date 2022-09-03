@@ -224,7 +224,7 @@ function isSameTime(time,baseTime){
 
 /**
  * 从NPM获取包最近发布的版本信息
- * @param {*} package  {name,folderName,fullpath,}
+ * @param {*} package  {name,dirName,fullpath,}
  */
 async function getPackageReleaseInfo(package) {
     const { silent,test } = this
@@ -235,6 +235,7 @@ async function getPackageReleaseInfo(package) {
             tags        : info["dist-tags"], 
             license     : info["license"], 
             author      : info["author"],
+            version     : info["version"],
             firstCreated: info.time["created"],
             lastPublish : info.time["modified"],
             size        : info.dist["unpackedSize"] 
@@ -250,28 +251,28 @@ async function getPackageReleaseInfo(package) {
  * 
  * 判断提交次数，如果大于0说明有改变
  * 
- * @param {*} package  {name,folderName,fullpath,modifiedTime} 
+ * @param {*} package  {name,dirName,fullpath,modifiedTime} 
  */
 async function packageIsDirty(package){ 
-    return await getPackageCommitCount.call(this,package,package.lastPublish) > 0
+    return await getPackageNewCommits.call(this,package,package.lastPublish) > 0
 }
 
 /**
  * 返回自relTime以来提交的次数
- * @param {*} package   {name,folderName,fullpath,}
- * @param {*} relTime 标准时间格式
+ * @param {*} package   {name,dirName,fullpath,}
+ * @param {*} fromTime   标准时间格式
  * @returns 
  */
-async function getPackageCommitCount(package,relTime){
+async function getPackageNewCommits(package,fromTime){
     const { silent } = this
-    const gitCmd = `git shortlog HEAD ${relTime ? '--after={'+relTime+'}': ''} -s -- packages/${package.folderName}`
+    const excludePackageJson = `":(exclude)${package.fullPath}/package.json"`
+    const gitCmd = `git shortlog HEAD ${fromTime ? '--after={'+fromTime+'}': ''} -s -- ${package.fullPath} ${excludePackageJson}`
     let count = 0
     shelljs.cd(package.fullPath)
     try{
         let result = await asyncExecShellScript(gitCmd,{ silent })
         count = result.split("\n").map(v=>parseInt(v)).reduce((prev,cur)=>prev+cur,0)  || 0
     }catch(e){ }   
-    package.newCommits = count 
     return count
 }
 /**
@@ -295,12 +296,19 @@ function getCurrentBranch(){
     return  execShellScriptWithReturns("git branch",{silent:true}).split("\n").filter(name=>name.trim().startsWith("*"))[0].replace("*","").trim()
 }
 
+function isEmpty(value){
+    if(value==undefined) return true
+    if(typeof(value)=="string" && value.trim()=='') return true
+    return false    
+}
+
 module.exports ={
     assertInWorkspaceRoot,
     assertInPackageRoot,           
     isGitRepo,
     isWorkspaceRoot,
     isPackageRoot,  
+    isEmpty,
     getPackageJson,
     getPackageRootFolder,
     getWorkspaceRootFolder,
@@ -315,7 +323,7 @@ module.exports ={
     isAfterTime,
     isSameTime,
     getPackageReleaseInfo,
-    getPackageCommitCount,
+    getPackageNewCommits,
     packageIsDirty,
     checkoutBranch,
     getCurrentBranch
