@@ -8,7 +8,8 @@
  * 
  */
 const { program } = require('commander');
-const { fstat } = require('fs-extra');
+const fs = require('fs-extra');
+const path = require('path');
 const createLogger = require("logsets"); 
 const { getWorkspaceContext,getPackages } = require('./context')
 const { getPackageReleaseInfo,getPackageJson,shortDate } = require('./utils')
@@ -21,21 +22,22 @@ const logger = createLogger();
  * 
  */
  async function syncPackages(){
+    const { workspaceRoot } = this
     const packages = this.packages
-    const tasks = logger.tasklist() 
-    logger.log("同步本地与NPM的包信息：")
+    const tasks = logger.tasklist("同步本地与NPM的包发布信息：")  
     for(let package of packages){
         tasks.add(`同步[${package.name}]`)
         try{
             // 1. 从NPM上读取已发布的包信息
             let releaseInfo = await getPackageReleaseInfo.call(this,package)
             if(releaseInfo){
-                let packageData = getPackageJson(package.dirName) 
+                let packageData = getPackageJson(path.join(workspaceRoot,"packages",dirName)) 
                 packageData.lastPublish =  releaseInfo.lastPublish      
-                packageData.version =  releaseInfo.version    
-                // 更新本地文件
-                fs.writeJSONSync(package.fullPath,packageData,{spaces:4})
-                // 
+                if(packageData.version !=  releaseInfo.version ){
+                    packageData.version =  releaseInfo.version    
+                    // 更新本地文件
+                    fs.writeJSONSync(path.join(package.fullPath,"package.json"),packageData,{spaces:4})
+                }        
                 tasks.complete(`${shortDate(package.lastPublish)}(v${packageData.version})`)          
             }else{
                 tasks.skip("不存在")

@@ -2,6 +2,7 @@ const shelljs = require("shelljs");
 const path = require("path")
 const fs = require("fs-extra")
 const dayjs = require("dayjs");
+const glob = require("fast-glob")
 const relativeTimeExtend = require("dayjs/plugin/relativeTime");
 dayjs.extend(relativeTimeExtend);
 require('dayjs/locale/zh-CN')
@@ -85,6 +86,29 @@ function getWorkspaceRootFolder(folder="./"){
  */
 function isWorkspaceRoot(folder){ 
     return monoRepoRootFlags.some(file=>fs.existsSync(path.join(folder,file)))
+}
+
+/**
+ * 发现当前工作区下的包文件夹列表
+ * 
+ * 即包括package.json的文件夹列表
+ * 该方法会遍历pacakges下的第二层文件夹来读取包列表
+ * 
+ * ["apps/vueapp","utils","runtime","vue","react"]
+ * 
+ * @Returns {Array} ["<相对packages的路径>",....]
+ */
+function findPackageDirs(){
+    const { excludes,workspaceRoot,includeDescendants = false} = this
+    const packagesPath = replaceAll(path.normalize(path.join(workspaceRoot,"packages")),path.sep,"/")
+    let pkgFiles = glob.sync([
+        includeDescendants ? packagesPath+"/**/package.json":packagesPath+"/*/package.json", 
+        "!**/node_modules"
+    ])
+    let packageDirs = pkgFiles.map(file=>path.dirname(file))
+                        .map(fullPath=>path.relative(packagesPath,fullPath))  // 转换为相对路径
+                        .filter(relDir=>!excludes.includes(relDir))
+    return packageDirs
 }
 
 /**
@@ -302,6 +326,25 @@ function isEmpty(value){
     return false    
 }
 
+/**
+ * 替换所有字符串
+ * 低版本ES未提供replaceAll,此函数用来替代
+ * @param {*} str 
+ * @param {*} findValue 
+ * @param {*} replaceValue 
+ */
+ function replaceAll(str,findValue,replaceValue){    
+    if(typeof(str)!=="string" || findValue=="" || findValue==replaceValue) return str
+    try{
+        return str.replace(new RegExp(escapeRegexpStr(findValue),"g"),replaceValue)
+    }catch{}
+    return str
+}
+
+function escapeRegexpStr(str){
+    return str.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1")
+} 
+
 module.exports ={
     assertInWorkspaceRoot,
     assertInPackageRoot,           
@@ -324,6 +367,7 @@ module.exports ={
     isSameTime,
     getPackageReleaseInfo,
     getPackageNewCommits,
+    findPackageDirs,
     packageIsDirty,
     checkoutBranch,
     getCurrentBranch

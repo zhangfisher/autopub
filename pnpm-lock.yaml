@@ -9,7 +9,7 @@ importers:
       enquirer: ^2.3.6
       fast-glob: ^3.2.11
       fs-extra: ^10.1.0
-      logsets: ^1.0.14
+      logsets: ^1.0.17
       shelljs: ^0.8.5
       yalc: 1.0.0-pre.53
     dependencies:
@@ -18,7 +18,7 @@ importers:
       enquirer: 2.3.6
       fast-glob: 3.2.11
       fs-extra: 10.1.0
-      logsets: 1.0.14
+      logsets: 1.0.17
       shelljs: 0.8.5
     devDependencies:
       yalc: 1.0.0-pre.53
@@ -333,8 +333,8 @@ packages:
       graceful-fs: 4.2.10
     dev: false
 
-  /logsets/1.0.14:
-    resolution: {integrity: sha512-HQweJzHDiZhVnhzyfUSFa9YmqLEbqk4xM7VMU36x6LTvQHNGQBuppF+yDPnaLvk3/Ro6jpBGLHVuOCccw3aK2Q==}
+  /logsets/1.0.17:
+    resolution: {integrity: sha512-K307It+e7ToitW+gBxtBkBtqo200yfMPEg9bGfBIL7JFKmZwdANrFw5ilxhfN7Zf/nwnrGL/ZoAjxLfe8nrbxg==}
     dependencies:
       '@babel/runtime-corejs3': 7.18.9
       ansicolor: 1.1.100

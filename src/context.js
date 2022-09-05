@@ -9,7 +9,9 @@ const fs = require("fs-extra");
 const path = require("path");
 const { 
     isEmpty,
+    findPackageDirs,
     getPackageJson, 
+    getPackageReleaseInfo,
     getWorkspaceRootFolder,
     getPackageNewCommits
 } = require("./utils"); 
@@ -19,8 +21,7 @@ const {
  * 获取指定包信息
  */
 async function getPackage(packageDirName){
-    const {excludes,workspaceRoot,workspace,test} = this
-     
+    const {excludes,workspaceRoot,workspace,test} = this     
 
     // 1. 获取包package.json数据
     const packageFullPath = path.join(workspaceRoot,"packages",packageDirName)
@@ -80,17 +81,17 @@ async function getPackage(packageDirName){
     const { excludes,workspaceRoot,workspace } = this
     
     // 1.读取所有包信息
-    const packageDirs = fs.readdirSync(path.join(workspaceRoot,"packages"))
+    const packageDirs = findPackageDirs.call(this)
     let packages = []
     for(let packageDirName of packageDirs){
         if(excludes.includes(packageDirName)) continue
         try{
             const pkgInfo = await getPackage.call(this,packageDirName)
             if(pkgInfo && !excludes.includes(pkgInfo.name)) {
-                packages.push(pkgInfo)
+                packages.push(pkgInfo)                
             }
         }catch(e){
-
+            console.log(e)
         }
     } 
     // 2.根据依赖关系进行排序： 不处理循环依赖关系
@@ -133,23 +134,24 @@ async function getPackage(packageDirName){
     // 2. 生成默认的工作区相关信息
     return {
         workspaceRoot,                               // 工作区根路径
-        excludes          : [],                      // 要排除发布的包名称，如果包含@代表是包名，也可以写文件夹名称
-        lastPublish       : null,                    // 最后发布的时间
-        buildScript       : "build",                 // 发布前执行构建的脚本
-        releaseScript     : "release",               // 发布命令,当发布所有包时会调用
-        report            : "versions.md",           // 发布报告信息,支持md和json两种格式
-        changeLogs        : "changeLogs",            // 发布变更日志
-        versionIncStep    : "patch",                 // 默认版本增长方式
-        silent            : true,                    // 静默发布，不提示信息
-        workspace         : workspaceInfo,           // 工作区package.json
-        distTag           : null,                    // 发布标签 
-        test              : false,                   // 模拟发布   
-        releaseBranch     : null,                    // 发布分支，未指定时采用当前分支
-        force             : false,                   // 强制发布包
-        pnpmPublishOptions: {},                      // 用来传递给pnpm publish的额外参数
-        packages          : null,                    // 要发布的所有包packages包信息
-        logs              : [],                      // 发包日志，后续会保存到autopub.log
-        log               : function(info){this.logs.push(info)},
+        excludes           : [],                      // 要排除发布的包名称，如果包含@代表是包名，也可以写文件夹名称
+        lastPublish        : null,                    // 最后发布的时间
+        buildScript        : "build",                 // 发布前执行构建的脚本
+        releaseScript      : "release",               // 发布命令,当发布所有包时会调用
+        report             : "versions.md",           // 发布报告信息,支持md和json两种格式
+        changeLogs         : "changeLogs",            // 发布变更日志
+        versionIncStep     : "patch",                 // 默认版本增长方式
+        silent             : true,                    // 静默发布，不提示信息
+        workspace          : workspaceInfo,           // 工作区package.json
+        includeDescendants : false,                   //  是否查找位于packaces下包括代代文件夹中的所有的包
+        distTag            : null,                    // 发布标签 
+        test               : false,                   // 模拟发布   
+        releaseBranch      : null,                    // 发布分支，未指定时采用当前分支
+        force              : false,                   // 强制发布包
+        pnpmPublishOptions : {},                      // 用来传递给pnpm publish的额外参数
+        packages           : null,                    // 要发布的所有包packages包信息
+        logs               : [],                      // 发包日志，后续会保存到autopub.log
+        log                : function(info){this.logs.push(info)},
         ...workspaceInfo.autopub || {},          // 配置参数
         ...options,
     }        
