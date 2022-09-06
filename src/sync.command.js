@@ -10,11 +10,10 @@
 const { program } = require('commander');
 const fs = require('fs-extra');
 const path = require('path');
-const createLogger = require("logsets"); 
+const logger = require("logsets"); 
 const { getWorkspaceContext,getPackages } = require('./context')
 const { getPackageReleaseInfo,getPackageJson,shortDate } = require('./utils')
-
-const logger = createLogger();
+ 
 
 /**
  * 
@@ -22,9 +21,9 @@ const logger = createLogger();
  * 
  */
  async function syncPackages(){
-    const { workspaceRoot } = this
+    const { workspaceRoot, log } = this
     const packages = this.packages
-    const tasks = logger.tasklist("同步本地与NPM的包发布信息：")  
+    const tasks = logger.tasklist("同步本地与NPM的包发布信息:")  
     for(let package of packages){
         tasks.add(`同步[${package.name}]`)
         try{
@@ -53,8 +52,14 @@ program
     .description("同步本地与NPM的包信息")
     .action(async (options) => {
         const context = getWorkspaceContext(options)
-        context.packages = await getPackages.call(context)
-        await syncPackages.call(context)
+        try{
+            context.packages = await getPackages.call(context)
+            await syncPackages.call(context)
+        }catch(e){
+            context.log(e.stack)
+        }finally{
+            context.end()
+        }
     })
 
 program.parse(process.argv);

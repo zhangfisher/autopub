@@ -21,9 +21,10 @@ const fs                      = require("fs-extra");
 const { prompt }              = require("enquirer");
 const path                    = require("path");
 const shelljs                 = require("shelljs");
-const createLogger            = require("logsets"); 
+const logger                  = require("logsets"); 
 const { Command ,Option}      = require('commander');
-const { getWorkspaceContext } = require('./context')
+const { getWorkspaceContext,getPackages } = require('./context')
+const { checkoutBranch, getCurrentBranch,recoveryFileToLatest } = require("./gitOperaters");
 const { 
     getPackageJson,
     getPackageRootFolder,
@@ -35,19 +36,14 @@ const {
     isSameTime,
     relativeTime,
     shortDate,
-    longDate,
-    checkoutBranch,
-    getCurrentBranch
- } = require("./utils"); 
+    longDate
+ } = require("./utils");
 
-
-const logger = createLogger(); 
-
+ 
 const VERSION_STEPS = ["major", "minor", "patch","premajor","preminor","prepatch","prerelease"]
 
 const program =new Command()
  
-
 /**
  * 运行指定包的发布脚本命令
  * @param {*} package   = {
@@ -99,6 +95,19 @@ function switchToReleaseBranch(){
     }
 }
 
+/**
+ * 当发布成功后为git添加发布标签
+ * 
+ * 如: 1.2.3-latest
+ * 
+ * 标签到由<版本号>+<dist-tag>组成
+ * 
+ */
+async function addReleaseTag(){
+    const { workspaceRoot,distTag } = this    
+
+
+}
 
 /**
  * 发布所有包
@@ -122,15 +131,26 @@ async function publishAllPackages(packages){
                 tasks.skip()
             }            
         }catch(e){
+            log(e.stack)
             tasks.error(`${e.message}`)
         }
     }
+
+    // 第五步：提交Git并打上标签
+    // 由于发布包后会修改packages/xxx/package.json
+    try{
+        tasks.add("提交Git并打上发布标签")
+        await addReleaseTag.call(this)
+    }catch(e){
+        log(e.stack)
+        tasks.error(e.message)
+    }
+
 }
 
 /**
  * 发布指定的包
  * 
- *  - 
  *  - 并且在package.json中记录最后发布时间
  * 
  * 本命令只能在包文件夹下执行
@@ -191,11 +211,11 @@ async function publishPackage(){
         tasks.complete()
 
     }catch(e){// 如果发布失败，则还原package.json        
-        fs.writeFileSync(pkgFile,JSON.stringify(packageBackup,null,4))
+        recoveryFileToLatest(pkgFile)
         tasks.error(`${e.message}`)
     }finally{        
         if(test && packageBackup){// 模拟测试时恢复修改版本号
-            fs.writeFileSync(pkgFile,JSON.stringify(packageBackup,null,4))
+            recoveryFileToLatest(pkgFile)
         }
     }
 }
@@ -299,6 +319,7 @@ program
     .command("init","注入必要的发包脚本命令",{executableFile: "./init.command.js"})
     .command("list","列出当前工作区的包",{executableFile: "./list.command.js"})
     .command("sync","同步本地与NPM的包信息",{executableFile: "./sync.command.js"})
+    .command("publish","发布指定的包",{executableFile: "./publish.command.js"})
 
 program
      .description("一健自动发包工具")
@@ -316,21 +337,27 @@ program
      .addOption(new Option('-i, --version-increment-step [value]', '版本增长方式').default("patch").choices(VERSION_STEPS))
      .action(async (options) => {              
         let context = getWorkspaceContext(options)
-        // 切换到发布分支
-        switchToReleaseBranch.call(this)
-        if(options.all){  // 自动发布所有包
-            context.packages =await  getPackages.call(context)
-            if(options.ask){
-                await askForPublishPackages.call(context,packages)                
+        try{
+            // 切换到发布分支
+            switchToReleaseBranch.call(this)
+            if(options.all){  // 自动发布所有包
+                context.packages =await  getPackages.call(context)
+                if(options.ask){
+                    await askForPublishPackages.call(context,packages)                
+                }
+                if(context.packages.length > 0){
+                await publishAllPackages.call(context,context.packages)
+                }
+            }else{// 只发布指定的包
+                await publishPackage.call(context)
             }
-            if(context.packages.length > 0){
-               await publishAllPackages.call(context,context.packages)
-            }
-        }else{// 只发布指定的包
-            await publishPackage.call(context)
-        }
-        // 在文档中输出各包的版本信息
-        generatePublishReport.call(context)
+            // 在文档中输出各包的版本信息
+            generatePublishReport.call(context)
+        }catch(e){
+            context.log(e.stack)
+        }finally{
+            context.end()
+        }        
      })
 
  program.parseAsync(process.argv);

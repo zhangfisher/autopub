@@ -251,7 +251,7 @@ function isSameTime(time,baseTime){
  * @param {*} package  {name,dirName,fullpath,}
  */
 async function getPackageReleaseInfo(package) {
-    const { silent,test } = this
+    const { silent,test,log } = this
     try{
         let results = await asyncExecShellScript(`npm info ${package.name} --json`,{silent})
         const info = JSON.parse(results)
@@ -265,6 +265,7 @@ async function getPackageReleaseInfo(package) {
             size        : info.dist["unpackedSize"] 
         }
     }catch(e){
+        log(`执行npm info ${package.name}出错: ${e.stack}`)
         return null;        
     }    
 }
@@ -279,45 +280,6 @@ async function getPackageReleaseInfo(package) {
  */
 async function packageIsDirty(package){ 
     return await getPackageNewCommits.call(this,package,package.lastPublish) > 0
-}
-
-/**
- * 返回自relTime以来提交的次数
- * @param {*} package   {name,dirName,fullpath,}
- * @param {*} fromTime   标准时间格式
- * @returns 
- */
-async function getPackageNewCommits(package,fromTime){
-    const { silent } = this
-    const excludePackageJson = `":(exclude)${package.fullPath}/package.json"`
-    const gitCmd = `git shortlog HEAD ${fromTime ? '--after={'+fromTime+'}': ''} -s -- ${package.fullPath} ${excludePackageJson}`
-    let count = 0
-    shelljs.cd(package.fullPath)
-    try{
-        let result = await asyncExecShellScript(gitCmd,{ silent })
-        count = result.split("\n").map(v=>parseInt(v)).reduce((prev,cur)=>prev+cur,0)  || 0
-    }catch(e){ }   
-    return count
-}
-/**
- * 切换到指定的分支
- */
- async function checkoutBranch(name){
-    try{
-        const result = await asyncExecShellScript(`git checkout ${name}`,{silent:true})
-        const current = getCurrentBranch()
-        if(current!=name) throw new Error(`切换到${name}分支失败`)
-    }catch(e){
-        throw new Error(`切换到<${name}>分支失败`)
-    }    
-}
-
-/**
- * 获取当前分支名称
- * @returns 
- */
-function getCurrentBranch(){
-    return  execShellScriptWithReturns("git branch",{silent:true}).split("\n").filter(name=>name.trim().startsWith("*"))[0].replace("*","").trim()
 }
 
 function isEmpty(value){
@@ -366,9 +328,6 @@ module.exports ={
     isAfterTime,
     isSameTime,
     getPackageReleaseInfo,
-    getPackageNewCommits,
     findPackageDirs,
     packageIsDirty,
-    checkoutBranch,
-    getCurrentBranch
 }
