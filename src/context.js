@@ -7,13 +7,13 @@
  */
 const fs = require("fs-extra");
 const path = require("path");
+const { getPackageNewCommits } = require("./gitOperates")
 const { 
     isEmpty,
     findPackageDirs,
     getPackageJson, 
     getPackageReleaseInfo,
-    getWorkspaceRootFolder,
-    getPackageNewCommits
+    getWorkspaceRootFolder 
 } = require("./utils"); 
 
 
@@ -31,7 +31,7 @@ async function getPackage(packageDirName){
     if(!packageInfo || (typeof(packageInfo)=='object' && !packageInfo.name )) return
 
     // 2. 读取当前包对工作区其他包的依赖列表,依赖是以"workspace:xxxx"的形式存在的
-    const { name, scripts,version,description,dependencies={},devDependencies={},peerDependencies={},optionalDependencies={} } = packageInfo
+    const { name, scripts,version,description,private=false, dependencies={},devDependencies={},peerDependencies={},optionalDependencies={} } = packageInfo
     let packageDependencies =[]
     // 如果包存在对工作区其他包的引用,则需要记录起来
     // 特别需要注意的是：依赖写的一般是包名，但是有时包名与包文件夹名称有可能不一定相同
@@ -46,6 +46,7 @@ async function getPackage(packageDirName){
         description,                                        // 包描述            
         version,                                            // 当前版本号
         scripts,                                            // 包脚本
+        private,                                            // 是否是私有包
         dirName     : packageDirName,                       // 文件夹名称，其可能与包名不一样
         lastPublish : packageInfo.lastPublish,              // 包最近一次发布的时间
         fullPath    : packageFullPath,                      // 完整路径
@@ -71,7 +72,7 @@ async function getPackage(packageDirName){
     try{
         package.newCommits  =  await getPackageNewCommits.call(this,package,package.lastPublish) 
         // 为什么要-1? 因为当发布成功后，会自动进行一次提交，提交修改的package.json等分布过程中产生的数据，这次提交不算
-        if(package.newCommits >0 ) package.newCommits = package.newCommits -1
+        if(package.newCommits >0 ) package.newCommits = package.newCommits - 1
         package.totalCommits =  await getPackageNewCommits.call(this,package)      
         package.isDirty =   package.newCommits  > 0 
     }catch(e){
@@ -95,7 +96,7 @@ async function getPackage(packageDirName){
         if(excludes.includes(packageDirName)) continue
         try{
             const pkgInfo = await getPackage.call(this,packageDirName)
-            if(pkgInfo && !excludes.includes(pkgInfo.name)) {
+            if(pkgInfo && !excludes.includes(pkgInfo.name) && !pkgInfo.private) {
                 packages.push(pkgInfo)                
             }
         }catch(e){
@@ -130,8 +131,10 @@ async function getPackage(packageDirName){
 /**
  * 当完成命令行时执行，用来进行一些
  */
-function quit(context){
-
+function endAutoPub(){
+    if(this.logs.length>0){
+        console.log(this.logs.join("\n----------"))
+    }    
 }
 
 /**
@@ -163,14 +166,13 @@ function quit(context){
         test               : false,                   // 模拟发布   
         releaseBranch      : null,                    // 发布分支，未指定时采用当前分支
         force              : false,                   // 强制发布包
-        pnpmPublishOptions : {},                      // 用来传递给pnpm publish的额外参数
         packages           : null,                    // 要发布的所有包packages包信息
         logs               : [],                      // 发包日志，后续会保存到autopub.log
-        ...workspaceInfo.autopub || {},          // 配置参数
+        ...workspaceInfo.autopub || {},               // 配置参数
         ...options
     }      
     context.log =   (function(info){this.logs.push(info)}).bind(context)
-    context.end = quit.bind(context)
+    context.end = endAutoPub.bind(context)
     return context
 }
 

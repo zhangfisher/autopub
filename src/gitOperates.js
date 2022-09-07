@@ -55,9 +55,21 @@ function recoveryFileToLatest(file){
     return  execShellScriptWithReturns(`git checkout -- ${file}`,{silent:true})
 }
 
+function commitFiles(files=[],message){
+    if(files.length==0) return
+    return  execShellScriptWithReturns(`git commit ${files.join(" ")} -m '${message}'`,{silent:true})
+}
+
+function addGitTag(tag,message){
+    return execShellScriptWithReturns(`git git -a ${tag} -m '{message}'`,{silent:true})
+
+}
+
 module.exports = {
     getPackageNewCommits,
     checkoutBranch,
     getCurrentBranch,
-    recoveryFileToLatest
+    recoveryFileToLatest,
+    commitFiles,
+    addGitTag
 }
