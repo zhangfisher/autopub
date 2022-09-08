@@ -21,7 +21,7 @@
         "enquirer": "^2.3.6",
         "fast-glob": "^3.2.11",
         "fs-extra": "^10.1.0",
-        "logsets": "^1.0.17",
+        "logsets": "^1.0.19",
         "shelljs": "^0.8.5"
     },
     "devDependencies": {
@@ -34,7 +34,7 @@
         "changeLogs": "changeLogs",
         "versionIncStep": "patch",
         "branch": "master",
-        "includeDescendants":false
+        "includeDescendants": false
     },
     "files": [
         "LICENSE",

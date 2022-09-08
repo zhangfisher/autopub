@@ -34,11 +34,10 @@ const {
     asyncExecShellScript,
     getFolderLastModified,
     getFileLastModified,
-    isAfterTime,
-    isSameTime,
     relativeTime,
     shortDate,
-    longDate
+    longDate,
+    removeArrayItem
  } = require("./utils");
 
  
@@ -136,7 +135,7 @@ async function publishAllPackages(packages){
                 this.package = package
                 await publishPackage.call(this,task)
                 publishedPackages.push(package)
-                tasks.complete(`${package.version}->${getPackageJson().version}`)
+                tasks.complete(`${package.version}->${package.newVersion}`)
             }else{
                 tasks.skip()
             }            
@@ -169,26 +168,23 @@ async function publishAllPackages(packages){
  * @param {*} options 
  */
 async function publishPackage(task){
-    const {workspaceRoot,distTag, build,test,buildScript,versionIncStep, silent,package:currentPackage} = this    
+    const {workspaceRoot,distTag, build,test,buildScript,versionIncStep, silent,package:currentPackage } = this    
     // 1. 切换到包所在目录
-    const packageFolder = currentPackage ? path.join(workspaceRoot,"packages",currentPackage) : getPackageRootFolder()
+    const packageFolder = currentPackage ? currentPackage.fullPath : getPackageRootFolder()
     const pkgFile = path.join(packageFolder, "package.json")
     if(!fs.existsSync(pkgFile)) throw new Error("无效的包路径:"+packageFolder)    
     shelljs.cd(packageFolder)        
 
     // 2. 读取package.json信息
     let  packageInfo  = getPackageJson(packageFolder)
-    const packageName = packageInfo.name
     const oldVersion = packageInfo.version        
-
-    
-    logger.log("发布包：{}",packageName)   
     
     let isChange = false , hasError = false
     
-    const isTaskItem = !!task
-    
-    const tasks = isTaskItem ? logger.tasklist() : null
+    const isAlonePublish = task == undefined
+    if(isAlonePublish) logger.log("发布包：{}",packageInfo.name)   
+
+    const tasks = isAlonePublish ? logger.tasklist() : null 
 
     const addTaskLog = (info)=>{
         if(task){
@@ -203,14 +199,15 @@ async function publishPackage(task){
         addTaskLog(`自增版本号(${versionIncStep}++)`) 
         await asyncExecShellScript.call(this,`npm version ${versionIncStep}`,{silent})              
         packageInfo = getPackageJson(packageFolder) // 重新读取包数据以得到更改后的版本号    
-        if(isTaskItem) tasks.complete(`${oldVersion}->${packageInfo.version}`)   
+        if(currentPackage) currentPackage.newVersion = packageInfo.version
+        if(isAlonePublish) tasks.complete(`${oldVersion}->${packageInfo.version}`)   
         isChange = true     // 有改变的包版本号
 
         // 第二步：构建包：发布前进行自动构建
         if(build && buildScript in packageInfo.scripts){
             addTaskLog("构建包")
             await asyncExecShellScript.call(this,`pnpm ${buildScript}`,{silent})
-            if(isTaskItem) tasks.complete()
+            if(isAlonePublish) tasks.complete()
         }      
 
         // 第三步：发布
@@ -224,17 +221,18 @@ async function publishPackage(task){
         if(distTag) opts.push(`--tag ${distTag}`)
         if(test) opts.push("--dry-run")
         await asyncExecShellScript.call(this,`pnpm publish ${opts.join(" ")}`,{silent})            
-        if(isTaskItem) tasks.complete()   
+        if(isAlonePublish) tasks.complete()   
 
         // 第四步：更新发布时间
         addTaskLog("更新发布时间")
         packageInfo.lastPublish = dayjs().format()
         fs.writeFileSync(pkgFile,JSON.stringify(packageInfo,null,4))
-        if(isTaskItem) tasks.complete()
+        if(isAlonePublish) tasks.complete()
 
     }catch(e){// 如果发布失败，则还原package.json        
         if(isChange) recoveryFileToLatest(pkgFile)
-        if(isTaskItem) tasks.error(`${e.message}`)
+        if(isAlonePublish) tasks.error(`${e.message}`)
+        throw e
     }finally{        
         if(test && isChange && !hasError){// 模拟测试时恢复修改版本号
             recoveryFileToLatest(pkgFile)
@@ -243,21 +241,19 @@ async function publishPackage(task){
 }
 
 // 生成包版本列表文件到文档中
-function generatePublishReport(){
+async function generatePublishReport(){
     const {workspaceRoot,distTag,report="versions.md"} = this 
     let reportFile = path.isAbsolute(report) ? report : path.join(workspaceRoot,report)
     const format = reportFile.endsWith('.json') ? 'json' : 'md'
     let results = format=='json' ? {} : []
 
-    if(format=='json'){
-
-    }else{
+    if(format=='md'){
         results.push("# 版本信息")
         results.push("| 包| 版本号| 最后更新 | 说明|")
         results.push("| --- | :---: | :---: | --- |")
-    }
-    
-    getPackages.call(this).forEach(package => {
+    }    
+    let packages = await getPackages.call(this)
+    packages.forEach(package => {
         const lastPublish = package.lastPublish ? longDate(package.lastPublish) : "None"
         if(format=='json'){
             results[package.name]= {
@@ -279,27 +275,38 @@ function generatePublishReport(){
  */
 async function askForPublishPackages(){
     let  { workspaceRoot,versionIncStep:curVerIncStep,packages } = this
-    let selectedCount = 0;
+    
     let packageChoices = packages.map(package => {
         const lastPublish    = package.lastPublish ? shortDate(package.lastPublish) : "None"
         const lastPublishRef = package.lastPublish ? `(${relativeTime(package.lastPublish)})` : ""
         return {
-            ...package,
             value: package,
-            name : `${package.name.padEnd(24)}Version: ${package.version.padEnd(8)} LastPublish: ${lastPublish.padEnd(16)}${lastPublishRef} newCommits: ${package.newCommits}`,                        }
+            name :package.name //   `${package.name.padEnd(24)} Version: ${package.version.padEnd(8)}, LastPublish: ${lastPublish.padEnd(16)}${lastPublishRef} newCommits: ${package.newCommits}`,  
+        }
     })
-    packageChoices.splice(0,0,"auto")
-    let questions = [
-        {
+    
+    const { isAuto } = await prompt({
+        type:"confirm",
+        name: 'isAuto',
+        message: '一健自动发包?',
+        initial:true,            
+        separator: () => '',
+        format: () => ''
+    });
+     
+    if(isAuto) return 
+
+    let selectedCount = 0 
+    let questions = [{
             type   : 'multiselect',
             name   : 'selectedPackages',
             message: '选择要发布的包',
             initial: 0,
-            choices: packageChoices,        
+            choices: packageChoices, 
             result: function(names) {
-                if (names.length === 0) return [];
-                selectedCount = names.length;
-                return names.includes('auto') ? 'auto' : Object.values(this.map(names));
+                const selected = packages.filter(package=>names.includes(package.name))
+                selectedCount = selected.length
+                return selected
             }
         },
         {
@@ -321,13 +328,7 @@ async function askForPublishPackages(){
         } 
     ]; 
     const {selectedPackages,distTag,versionIncStep} = await prompt(questions);
-    
-    let context  = this
-    if(selectedPackages!='auto'){
-        context.packages = selectedPackages
-    }  
-    context.distTag        = distTag 
-    context.versionIncStep = versionIncStep
+    return  {selectedPackages,distTag,versionIncStep}
 }
 
 
@@ -336,15 +337,14 @@ program
     .command("init","注入必要的发包脚本命令",{executableFile: "./init.command.js"})
     .command("list","列出当前工作区的包",{executableFile: "./list.command.js"})
     .command("sync","同步本地与NPM的包信息",{executableFile: "./sync.command.js"})
-    .command("publish","发布指定的包",{executableFile: "./publish.command.js"})
 
 program
      .description("一健自动发包工具")
      .option("-a, --all", "发布所有包")
      .option("-f, --force", "强制发布包")
      .option("-n, --no-ask", "不询问直接发布")
-     .option("-p, --package [name]", "指定要发布的包名称")
      .option("-s, --no-silent", "静默显示脚本输出")
+     .option("-p, --package", "发布指定包")
      .option("--test", "模拟发布")
      .option("--no-build", "发布前不执行Build脚本")
      .option("-b, --release-branch", "发布Git分支")     
@@ -357,19 +357,26 @@ program
         try{
             // 切换到发布分支
             switchToReleaseBranch.call(this)
-            if(options.all){  // 自动发布所有包
-                context.packages =await  getPackages.call(context)
-                if(options.ask){
-                    await askForPublishPackages.call(context)                
+            if(options.package){// 只发布指定的包
+                await publishPackage.call(context)
+            }else{
+                context.packages =await getPackages.call(context)                
+                // 如果指定all代表自动发布所有包，不再询问
+                if(!options.all){  
+                    const { selectedPackages,versionIncStep,distTag } = await askForPublishPackages.call(context)               
+                    if(selectedPackages)  {
+                        context.packages = selectedPackages                        
+                        if(selectedPackages.length==0) return
+                        context.force = true  // 当手动选择时代表要强制发布指定的包
+                    }                    
+                    context.distTag        = distTag 
+                    context.versionIncStep = versionIncStep
                 }
                 if(context.packages.length > 0){
-                await publishAllPackages.call(context,context.packages)
+                    await publishAllPackages.call(context,context.packages)
                 }
-            }else{// 只发布指定的包
-                await publishPackage.call(context)
             }
-            // 在文档中输出各包的版本信息
-            generatePublishReport.call(context)
+            await generatePublishReport.call(context)
         }catch(e){
             context.log(e.stack)
         }finally{

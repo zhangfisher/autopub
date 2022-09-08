@@ -7,7 +7,7 @@
  */
 const fs = require("fs-extra");
 const path = require("path");
-const { getPackageNewCommits } = require("./gitOperates")
+const { getPackageNewCommits,checkoutBranch } = require("./gitOperates")
 const { 
     isEmpty,
     findPackageDirs,
@@ -135,6 +135,9 @@ function endAutoPub(){
     if(this.logs.length>0){
         console.log(this.logs.join("\n----------"))
     }    
+    if(this.oldBranch){
+        checkoutBranch(this.oldBranch)
+    }
 }
 
 /**

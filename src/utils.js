@@ -307,6 +307,14 @@ function escapeRegexpStr(str){
     return str.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1")
 } 
 
+function removeArrayItem(arr,item){
+    let index 
+    while((index = arr.indexOf(item))!=-1){
+        arr.splice(index,1)
+    }
+    return arr
+}
+
 module.exports ={
     assertInWorkspaceRoot,
     assertInPackageRoot,           
@@ -330,4 +338,5 @@ module.exports ={
     getPackageReleaseInfo,
     findPackageDirs,
     packageIsDirty,
+    removeArrayItem
 }
