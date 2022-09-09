@@ -132,8 +132,16 @@ async function getPackage(packageDirName){
  * 当完成命令行时执行，用来进行一些
  */
 function endAutoPub(){
-    if(this.logs.length>0){
-        console.log(this.logs.join("\n----------"))
+    const { debug,workspaceRoot } = this
+    if(this.logs.length>0 ){
+        let errLogs = this.logs.filter(log=>log.startsWith("ERROR:"))
+        const separator = "\n"
+        if(errLogs.length>0){
+            console.log(errLogs.join(separator))
+        }        
+        if(debug){
+            fs.writeFileSync(path.join(workspaceRoot,"autopub.log"),this.logs.join(separator))
+        }
     }    
     if(this.oldBranch){
         checkoutBranch(this.oldBranch)
@@ -154,7 +162,8 @@ function endAutoPub(){
     const workspaceInfo = getPackageJson(workspaceRoot)
     // 2. 生成默认的工作区相关信息
     const context = {
-        workspaceRoot,                               // 工作区根路径
+        workspaceRoot,                                // 工作区根路径
+        debug              : false,                   // 运行完成后在工作区输出一个log文件  
         excludes           : [],                      // 要排除发布的包名称，如果包含@代表是包名，也可以写文件夹名称
         lastPublish        : null,                    // 最后发布的时间
         buildScript        : "build",                 // 发布前执行构建的脚本

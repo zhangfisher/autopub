@@ -164,7 +164,8 @@ function execShellScript(script,options={}){
  * @returns 
  */
 async function asyncExecShellScript(script,options={}){
-    const { silent=true} = this
+    const { silent=true,log} = this
+    log(`Run Script: ${script}`)
     return new Promise((resolve,reject)=>{
         shelljs.exec(script,{silent,...options,async:true},(code,stdout)=>{
             if(code>0){
@@ -180,7 +181,8 @@ async function asyncExecShellScript(script,options={}){
   * @param {*} script 
   */
 function execShellScriptWithReturns(script,options={}){
-    return shelljs.exec(script,options).stdout.trim()
+    let { silent } = this
+    return shelljs.exec(script,{silent,...options}).stdout.trim()
 }
 
 /** 
@@ -253,7 +255,7 @@ function isSameTime(time,baseTime){
 async function getPackageReleaseInfo(package) {
     const { silent,test,log } = this
     try{
-        let results = await asyncExecShellScript(`npm info ${package.name} --json`,{silent})
+        let results = await asyncExecShellScript.call(this,`npm info ${package.name} --json`,{silent})
         const info = JSON.parse(results)
         return {
             tags        : info["dist-tags"], 
@@ -265,7 +267,7 @@ async function getPackageReleaseInfo(package) {
             size        : info.dist["unpackedSize"] 
         }
     }catch(e){
-        log(`执行npm info ${package.name}出错: ${e.stack}`)
+        log(`ERROR: 执行npm info ${package.name}出错: ${e.stack}`)
         return null;        
     }    
 }

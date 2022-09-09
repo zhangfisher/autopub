@@ -26,7 +26,7 @@ const dayjs                   = require("dayjs")
 const { Command ,Option}      = require('commander');
 const { getWorkspaceContext,getPackages } = require('./context')
 
-const { checkoutBranch, getCurrentBranch,recoveryFileToLatest,commitFiles } = require("./gitOperates");
+const { checkoutBranch, getCurrentBranch,recoveryFileToLatest,commitFiles,addGitTag } = require("./gitOperates");
 const { 
     getPackageJson,
     getPackageRootFolder,
@@ -41,7 +41,7 @@ const {
  } = require("./utils");
 
  
-const VERSION_STEPS = ["major", "minor", "patch","premajor","preminor","prepatch","prerelease"]
+const VERSION_STEPS = ["major", "minor", "patch","premajor","preminor","prepatch","prerelease","none"]
 
 const program =new Command()
  
@@ -76,15 +76,16 @@ function switchToReleaseBranch(){
     let { releaseBranch } = this
     let currentBranch,isCheckout = false    
     try{        
-        currentBranch = getCurrentBranch()
+        currentBranch = getCurrentBranch.call(this)
         logger.log("- 当前分支: {}",currentBranch)
         logger.log("- 发布分支: {}",releaseBranch || currentBranch)
         if(releaseBranch && releaseBranch != currentBranch){
             logger.log("- 切换到发布分支: {}",releaseBranch)
-            checkoutBranch(releaseBranch)
+            checkoutBranch.call(this,releaseBranch)
             isCheckout = true
         }             
     }catch(e){        
+        this.log(`ERROR: ${e.stack}`)
         throw e
     }finally{
         if(isCheckout){
@@ -103,17 +104,17 @@ function switchToReleaseBranch(){
  * 由于各包采用的是不同的版本号，所有在工作区开发分支上打上dist-tag,但是不包括版本号
  */
 async function commitChanges(publishedPackages){
-    const { workspaceRoot,distTag,addGitTag } = this    
+    const { workspaceRoot,distTag,autoGitTag } = this    
     if(publishedPackages.length==0) return 
     // 1. 提交改变
     const pkgFiles = publishedPackages.map(pakcage=>path.join(package.fullPath,"package.json"))
     const pubMessages = publishedPackages.map(package=>{
         `release: v${package.version}${distTag ? '-' + distTag : ''}`
     })
-    commitFiles(pkgFiles,pubMessages.join("\n"))
+    commitFiles.call(this,pkgFiles,pubMessages.join("\n"))
     // 2. 打上标签
-    if(addGitTag){
-        addGitTag(`${publishedPackages[0].name}-${distTag ? distTag+'-' : ''}${publishedPackages[0].version}`,pubMessages)
+    if(autoGitTag){
+        addGitTag.call(this,`${publishedPackages[0].name}-v${publishedPackages[0].version}${distTag ? '-'+distTag : ''}`,pubMessages)
     }
 }
 
@@ -122,7 +123,7 @@ async function commitChanges(publishedPackages){
  * @param {*} packages  [{...},{...}]
  */
 async function publishAllPackages(packages){
-    const { workspaceRoot,force,log,test } = this  
+    const { workspaceRoot,distTag,force,log,test } = this  
     let publishedPackages = []  // 保存成功发布的包的package.json文件  
 
     logger.log("- 开始发布包：")    
@@ -135,24 +136,27 @@ async function publishAllPackages(packages){
                 this.package = package
                 await publishPackage.call(this,task)
                 publishedPackages.push(package)
-                tasks.complete(`${package.version}->${package.newVersion}`)
+                tasks.complete(`${package.version}->${package.newVersion}${(distTag && distTag!='latest') ? '-'+ distTag: ''}`)
             }else{
                 tasks.skip()
             }            
         }catch(e){
-            log(e.stack)
+            log(`ERROR: ${e.stack}`)
             tasks.error(`${e.message}`)
         }
-    }
-
+    } 
+    if(publishedPackages.length>0){
+        logger.log("- 成功发布：{}",publishedPackages.map(package=>package.name).join(","))   
+    }    
     // 第五步：提交Git并打上标签
     // 由于发布包后会修改packages/xxx/package.json
-    if(!test){
+    if(!test && publishedPackages.length>0){
         try{
             tasks.add("提交变更到Git")
-            await commitChanges.call(this,pkgFiles)
+            await commitChanges.call(this,publishedPackages)
+            tasks.complete()
         }catch(e){
-            log(e.stack)
+            log(`ERROR: ${e.stack}`)
             tasks.error(e.message)
         }
     }
@@ -196,12 +200,14 @@ async function publishPackage(task){
 
     try{
         //  第1步： 更新版本号和发布时间
-        addTaskLog(`自增版本号(${versionIncStep}++)`) 
-        await asyncExecShellScript.call(this,`npm version ${versionIncStep}`,{silent})              
-        packageInfo = getPackageJson(packageFolder) // 重新读取包数据以得到更改后的版本号    
-        if(currentPackage) currentPackage.newVersion = packageInfo.version
-        if(isAlonePublish) tasks.complete(`${oldVersion}->${packageInfo.version}`)   
-        isChange = true     // 有改变的包版本号
+        if(versionIncStep!='none'){
+            addTaskLog(`自增版本号(${versionIncStep}++)`) 
+            await asyncExecShellScript.call(this,`npm version ${versionIncStep}`,{silent})              
+            packageInfo = getPackageJson(packageFolder) // 重新读取包数据以得到更改后的版本号    
+            if(currentPackage) currentPackage.newVersion = packageInfo.version
+            if(isAlonePublish) tasks.complete(`${oldVersion}->${packageInfo.version}`)   
+            isChange = true     // 有改变的包版本号
+        }
 
         // 第二步：构建包：发布前进行自动构建
         if(build && buildScript in packageInfo.scripts){
@@ -230,26 +236,26 @@ async function publishPackage(task){
         if(isAlonePublish) tasks.complete()
 
     }catch(e){// 如果发布失败，则还原package.json        
-        if(isChange) recoveryFileToLatest(pkgFile)
+        if(isChange) recoveryFileToLatest.call(this,pkgFile)
         if(isAlonePublish) tasks.error(`${e.message}`)
         throw e
     }finally{        
         if(test && isChange && !hasError){// 模拟测试时恢复修改版本号
-            recoveryFileToLatest(pkgFile)
+            recoveryFileToLatest.call(this,pkgFile)
         }
     }
 }
 
 // 生成包版本列表文件到文档中
 async function generatePublishReport(){
-    const {workspaceRoot,distTag,report="versions.md"} = this 
+    const {workspaceRoot,distTag,report="versions.md",test} = this 
     let reportFile = path.isAbsolute(report) ? report : path.join(workspaceRoot,report)
     const format = reportFile.endsWith('.json') ? 'json' : 'md'
     let results = format=='json' ? {} : []
 
     if(format=='md'){
         results.push("# 版本信息")
-        results.push("| 包| 版本号| 最后更新 | 说明|")
+        results.push("| 包| 版本 | 最新发布 | 说明|")
         results.push("| --- | :---: | :---: | --- |")
     }    
     let packages = await getPackages.call(this)
@@ -266,6 +272,9 @@ async function generatePublishReport(){
             results.push(`|**${package.name}**|${package.version}|${lastPublish}|${package.description}|`)    
         }        
     })     
+    if(test){
+        reportFile=reportFile.replace(".md",".test.md").replace(".json",".test.json")
+    } 
     fs.writeFileSync(reportFile, results.join("\n"))
 }
 
@@ -294,7 +303,7 @@ async function askForPublishPackages(){
         format: () => ''
     });
      
-    if(isAuto) return 
+    if(isAuto) return {}
 
     let selectedCount = 0 
     let questions = [{
@@ -322,16 +331,15 @@ async function askForPublishPackages(){
             name   : 'distTag',
             message: '指定发布标签：',
             footer : 'eg. latest, beta, test, alpha, stable, next, ...',
-            initial: 'latest',
-            result : (tag) => tag === 'latest' ? null : tag,
+            initial: distTag || 'latest',
             skip   : () => selectedCount === 0
         } 
     ]; 
-    const {selectedPackages,distTag,versionIncStep} = await prompt(questions);
+    let {selectedPackages,distTag,versionIncStep} = await prompt(questions);
+    if(distTag === 'latest')  distTag = null
+
     return  {selectedPackages,distTag,versionIncStep}
 }
-
-
 
 program
     .command("init","注入必要的发包脚本命令",{executableFile: "./init.command.js"})
@@ -342,12 +350,12 @@ program
      .description("一健自动发包工具")
      .option("-a, --all", "发布所有包")
      .option("-f, --force", "强制发布包")
-     .option("-n, --no-ask", "不询问直接发布")
      .option("-s, --no-silent", "静默显示脚本输出")
      .option("-p, --package", "发布指定包")
      .option("--test", "模拟发布")
      .option("--no-build", "发布前不执行Build脚本")
      .option("-b, --release-branch", "发布Git分支")     
+     .option("--debug", "调试模式")     
      .option("-e, --excludes [...name]", "排除不发布的包列表",[])
      .option("--auto-git-tag", "发布成功后添加Git tag")
      .option("--dist-tag <value>", "dist-tag")
@@ -368,9 +376,9 @@ program
                         context.packages = selectedPackages                        
                         if(selectedPackages.length==0) return
                         context.force = true  // 当手动选择时代表要强制发布指定的包
-                    }                    
-                    context.distTag        = distTag 
-                    context.versionIncStep = versionIncStep
+                        context.distTag        = distTag 
+                        context.versionIncStep = versionIncStep
+                    }
                 }
                 if(context.packages.length > 0){
                     await publishAllPackages.call(context,context.packages)
@@ -378,7 +386,7 @@ program
             }
             await generatePublishReport.call(context)
         }catch(e){
-            context.log(e.stack)
+            context.log(`ERROR: ${e.stack}`)
         }finally{
             context.end()
         }        
