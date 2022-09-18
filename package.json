@@ -1,7 +1,7 @@
 {
     "name": "autopub",
     "version": "1.0.0",
-    "description": "Auto publish tool for monorepo",
+    "description": "Auto publish tool for pnpm/monorepo",
     "main": "./src/index.js",
     "repository": "https://gitee.com/zhangfisher/autopub.git",
     "homepage": "https://zhangfisher.github.io/autopub/",
@@ -22,6 +22,7 @@
         "fast-glob": "^3.2.11",
         "fs-extra": "^10.1.0",
         "logsets": "^1.0.19",
+        "semver": "^7.3.7",
         "shelljs": "^0.8.5"
     },
     "devDependencies": {

@@ -29,9 +29,9 @@ program
             } 
             table.render()
         }catch(e){
-            context.log(e.stack)
+            context.log(`ERROR: ${e.stack}`)
         }finally{
-            context.end()
+            await context.end()
         }
     })
 

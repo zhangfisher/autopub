@@ -71,8 +71,6 @@ async function getPackage(packageDirName){
     // 3. 读取包至上次发布以来的GIT提交信息
     try{
         package.newCommits  =  await getPackageNewCommits.call(this,package,package.lastPublish) 
-        // 为什么要-1? 因为当发布成功后，会自动进行一次提交，提交修改的package.json等分布过程中产生的数据，这次提交不算
-        if(package.newCommits >0 ) package.newCommits = package.newCommits - 1
         package.totalCommits =  await getPackageNewCommits.call(this,package)      
         package.isDirty =   package.newCommits  > 0 
     }catch(e){
@@ -131,7 +129,7 @@ async function getPackage(packageDirName){
 /**
  * 当完成命令行时执行，用来进行一些
  */
-function endAutoPub(){
+async function endAutoPub(){
     const { debug,workspaceRoot } = this
     if(this.logs.length>0 ){
         let errLogs = this.logs.filter(log=>log.startsWith("ERROR:"))
@@ -144,7 +142,7 @@ function endAutoPub(){
         }
     }    
     if(this.oldBranch){
-        checkoutBranch(this.oldBranch)
+        await checkoutBranch(this.oldBranch) 
     }
 }
 
@@ -167,7 +165,6 @@ function endAutoPub(){
         excludes           : [],                      // 要排除发布的包名称，如果包含@代表是包名，也可以写文件夹名称
         lastPublish        : null,                    // 最后发布的时间
         buildScript        : "build",                 // 发布前执行构建的脚本
-        releaseScript      : "release",               // 发布命令,当发布所有包时会调用
         report             : "versions.md",           // 发布报告信息,支持md和json两种格式
         changeLogs         : "changeLogs",            // 发布变更日志
         versionIncStep     : "patch",                 // 默认版本增长方式

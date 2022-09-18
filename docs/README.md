@@ -41,9 +41,9 @@
 // package.json
 {
     "scripts":{
-        "publish:mock":"pnpm autopub --all --no-ask --dry-run",
-        "publish:auto":"pnpm autopub --all --no-ask", 
-        "publish:all":"pnpm autopub --all",  
+        "publish:test":"pnpm autopub --test",
+        "publish:auto":"pnpm autopub --all", 
+        "publish:all":"pnpm autopub",  
         "publish:[包名称]":"pnpm autopub --package [包名称]",    
         "publish:[包名称]":"pnpm autopub --package [包名称]",    
         ......
@@ -53,19 +53,6 @@
 ``` 
 !>  `publish:mock`、`publish:auto`、`publish:all`仅是默认注入的发包命令，您也可以自己根据`autopub`命令行参数自己编写发包命令，比如编写`publish:beta`之类发布带有`distTag`的包，参见后面命令行参数介绍。
      
-
-- **`autopub init`命令在当前工作区`packages`下的所有包的`package.json`注入脚本**
-
-在当前工作区`packages`下的所有包均需要使用`autopub`来发布，当执行`publish:auto`时会依次调用各包中的`release`脚本来发布。
-
-```javascript
-// package.json
-{
-   "scripts":{
-        "release":"pnpm autopub" 
-   }
-}
-```
 ## 第三步：自动发布
 
 当配置好以上发包脚本后，在需要发布时就可以直接调用相应的脚本命令来发包了。
@@ -79,84 +66,49 @@
 > pnpm publish:auto
 ```
 
-- **发布指定包**
+- **交互自动发包**
 
-`voerkai18n`共有8个包，执行`autopub init`后，会在工作区package.json注入对应包的发包脚本。如下：
+`pnpm publish:auto`是全自动发包，而`pnpm publish:all`命令则会询问用户要发哪个包，以及发布的标签等。
 
 ```javascript
-// package.json
-{
-    "scripts":{ 
-        ...   
-        "publish:cli":"pnpm autopub --package cli",    
-        "publish:runtime":"pnpm autopub --package runtime",   
-        "publish:formatters":"pnpm autopub --package formatters",   
-        "publish:vue":"pnpm autopub --package vue",  
-        "publish:react":"pnpm autopub --package react",  
-        "publish:babel":"pnpm autopub --package babel",  
-        "publish:vite":"pnpm autopub --package vite",  
-        "publish:utils":"pnpm autopub --package utils",  
-    }
-}
-
+> pnpm publish:all
 ``` 
+- **发布指定包**
 
 当想发布指定包时，只需要执行`publish:<包名称>`即可，如下：
 
-```javascript
-> pnpm publish:cli
-> pnpm publish:runtime
+```shell
+> pnpm publish:<包名称>
 ```
-
-**说明：*单独发布包好象不能体现出`AutoPub`优势,这仅仅是整个过程自动化发包流程中的一环而已。
 
 # 指南
 
-## 命令行
+## 全自动发包
 
-`autopub`命令行参数如下：
+当启用`autpub --all`时进行全程自动化发包，`autpub`会比对最近发布时间和最近Git提交时间，然后自动发布自上一次发布以来进行过提交的包。
+整个发布过程是全自动的，不需要人工介入。
 
-```shell
-
-一健自动发包工具
-
-Options:
-  -a， --all                             发布所有包
-  -n， --no-ask                          不询问
-  -s， --no-silent                       静默显示脚本输出
-  -p， --package                         指定要发布的包
-  -d， --dry-run                         模拟发布
-  -t,  --dist-tag <value>                 发布标签
-  -i， --version-increment-step [value]  版本自动增长方式，default:patch
-  -e, --excludes                         排除要发布的包
-  -f, --force                            强制发布包
-  -h， --help                            display help for command
-
-Commands:
-  list                                  列出各个包的最后一次提交时间和版本信息
-
-```
-
-## 自动发布
-
-当启用`-a`、`--no-ask`参数时，代表不会询问让用户选择要发布的包，全程自动化发包，会根据比对最近一次发布时间和工程文件夹中最近修改时间来自动发布。
-
+- 绝大多数情况下，您只需要在进行了Git提交后，运行一下`autopub --all`即可，不需要去操心要发哪个包。
+- 自动发包时会自动增加版本号，默认会自动增加版本`patch`值，也可以指定版本自增方式,如`autopub --all -i minor`。
 
 ## 交互式发包
-当没有启用`--no-ask`时,代表不会询问让用户选择要发布的包，版本自动增长方式，发布标签等参数。
 
-- `--no-silent`代表是否不输出脚本输出。
+如果没有启用`--all`时,会询问用户:
+
+- 选择要发布的包
+- 版本自动增长方式
+- 发布标签
 
 ## 发包顺序
 
-由于包之间存在依赖关系，`autopub`会根据依赖关系进行排序发布和关联发布。比如`@voerkai18n/cli`依赖于`@voerkai18n/utils`，当`@voerkai18n/utils`有更新需要发布时，`@voerkai18n/cli`也会自动发布。
+由于工作区包之间存在依赖关系，某此包的发布可能会依赖于其他包，因此`autopub`会根据依赖关系进行排序发布和关联发布。比如`@voerkai18n/cli`依赖于`@voerkai18n/utils`，当`@voerkai18n/utils`有更新需要发布时，`@voerkai18n/cli`也会自动发布。
 
 ## 版本自动增长方式
 
 默认情况下，发包时均会升级`patch`版本号，可以通过`-i`参数来修改递增版本号。
 
 ```shell
-> pnpm public:auto -i <major | minor | patch | premajor | preminor | prepatch | prerelease>
+> pnpm publish:auto -i <major | minor | patch | premajor | preminor | prepatch | prerelease>
 > pnpm autopub -i <major | minor | patch | premajor | preminor | prepatch | prerelease>
 ```
 
@@ -165,36 +117,31 @@ Commands:
 ```javascript
 {
     "scripts":{
-         "publish:auto":"pnpm autopub --all --no-ask -i minor",  // 每次发包均递增minor
+         "publish:auto":"pnpm autopub --all -i minor",  // 每次发包均递增minor
     }
 }
 ```
-
-
-## 模拟发布
-
-启用`-d, --dry-run`参数可以进行模拟发布，该参数会导致走完整个发包流程，但是没有实际发布到`NPM`。
-该参数主要用于测试。
-## 排除要发布的包
-
-在`packages`文件夹下的包，有些是测试应用等，并不需要进行发包，此时就需要配置需要排除哪些要发布的包，方法如下：
-
-- 在命令行中传入`-e, --excludes`参数
-
-```javascript
-> pnpm autopub -e utils apps  // 代表utils和apps两个包不发布
-```
-
-也可以在当前工作区`package.json`中配置：
-
+也可以在工作区的`package.json/autopub`配置文件中指定默认的版本自增方式
 ```javascript
 {
     autopub:{
-        excludes:["utils","apps"]
+        versionIncStep: "patch"                
     }
 }
 ```
+## 模拟发布
 
+启用`--test`参数可以进行模拟发布，该参数会导致走完整个发包流程，但是没有实际发布到`NPM`。
+该参数主要用于测试。
+
+## 排除要发布的包
+
+在`packages`文件夹下的包，有些是测试应用等，并不需要进行发包，此时就需要配置需要排除哪些要发布的包，方法非常简单，只需要设置`package.json`中的`privite=true`即可.
+```javascript
+{
+    "private":true
+}
+```
 ## 发布报告
 
 当执行完自动发包会生成一份当前工作区的所有包的简单发布信息，目前支持两种格式：
@@ -233,31 +180,24 @@ Commands:
 
 ## 单独包发布
 
-默认情况下，工作区下所有包的`package.json`中均需要增加了`release`的脚本命令。
-```javascript
-// package.json
-{
-   "scripts":{
-        "release":"pnpm autopub" 
-   }
-}
+大部份情况下，只需要执行`autopub --all`进行自动发布即可，或者也可以执行`autopub`，然后在交互询问时选择要发布的包。
+也可以通过`--package`参数指定来单独发布某个包。
+```shell
+> pnpm autopub --package <包名>
+```
+## 发布标签
+
+发布时可以指定`autopub --dist-tag <标签>`用来指定发布标签，例如`autopub --dist-tag beta`。
+
+## 发布分支
+
+默认情况下，发布分支采用当前Git分支，也可以指定要发布哪一个分支，然后在执行`autopub`时会切换到该分支再进行发布。
+```shell
+> pnpm autopub --release-branch master              #切换到master分支
+> pnpm autopub -b master
 ```
 
-各个包下的`release`的脚本命令在执行`pnpm autopub -a --no-ask`时会均被调用执行。
-因此，如果您可以修改该脚本，在发布时干点什么，比如：
-```javascript
-// package.json
-{
-   "scripts":{
-        "release":"<xxxx> && pnpm autopub" 
-   }
-}
-```
-默认情况下， `autopub`会采用静默输出方式，脚本执行时的过程信息不会被显示出来，这样当出错时显示的信息可能不够详尽，您可以使用`--no-silent`参数来输出执行过程信息,这样当出错时就可以得到更加详细的信息。
 
-```javascript
-> pnpm publish:auto --no-silent
-```
 
 ## 默认配置
 
@@ -266,17 +206,30 @@ Commands:
 ```javascript
 {
     "autopub":{
-        "report": "versions.md",                  // 发包报告,支持md和json两种格式
-        "excludes":["utils","apps"],    
-        "versionIncStep": "patch",                // 默认版本增长方式
-        "publishScript": "release",               // 包发布脚本名称
+        "report": "versions.md",           // 发包报告,支持md和json两种格式
+        "excludes":["utils","apps"],       // 可选的，指定排除某些包
+        "versionIncStep": "patch",         // 默认版本增长方式
+        "releaseBranch": "",               // 发布分支
+        "distTag":""                       // 发布标签
     }
 }
 ```
+## 同步包发布信息
 
+执行`autopub sync`命令会读取包在`NPM`上已发布的包信息(主要是最近发布的时间)，然后更新到本地`package.json`的`lastPublish`字段中。
+`autopub`需要知道最近一次发布是什么时候，才能以此时间为基准来读取自`lastPublish`时间以来是否有提交，从而进行自动发包。
+
+**什么时候使用该命令？**
+
+- 当在使用`autopub`以前就发布过包的,则应该同步发布信息
+- 如果`package.json`没有及时同步或冲突导致`package.json`的`lastPublish`字段值丢失或者失效时，也应该执行此命令来同步。
+
+每一次使用`autopub`发布包时，均会更新对应包的`package.json`的`lastPublish`字段值。这样一般情况下是不需要调用`autopub sync`的。
+如果您不是使用`autopub`发布包，则此时就缺少或不正确的`lastPublish`字段值，这样`autopub`就不能正确进行一健自动发包。
+此时，就需要执行`autopub sync`命令来修复`package.json`中`lastPublish`字段值到正确的值。
 ## 列出包
 
-`autopub list`列出当前工作区的所有包，并显示当前包`最近一次发布`和`最近修改时间`。
+`autopub list`列出当前工作区的所有包，并显示当前包`最近发布时间`和`自上次发布以来的GIT提交数`。
 
 
 # 常见问题
@@ -284,3 +237,8 @@ Commands:
 - **Q：调用`autopub`时为什么要使用`pnpm autopub`的方式?**
 
 因为在`pnpm/monorepo`工程中，包与包之间可能存在依赖关系，并且其依赖采用的是类似`workspace:^1.0.2`的形式，使用`pnpm autopub`形式时，`pnpm`才可以帮助进行依赖的转换,否则不能正确地处理包与包之间的依赖。
+
+- **Q: `pnpm -r publish`也可以自动发布所有包，还有必要使用`autopub`吗?**
+
+当运行此命令`pnpm -r publish`时,`pnpm`将把所有版本尚未发布到注册表的包发布。但是这个命令是比较鸡肋的，并不能自动发包。
+具体效果谁用谁知道，否则就没有必要再开发`autopub`了。

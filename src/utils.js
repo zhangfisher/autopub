@@ -1,5 +1,6 @@
 const shelljs = require("shelljs");
 const path = require("path")
+const semver = require('semver')
 const fs = require("fs-extra")
 const dayjs = require("dayjs");
 const glob = require("fast-glob")
@@ -245,8 +246,7 @@ function isAfterTime(time,baseTime){
 function isSameTime(time,baseTime){
     return dayjs(time).isSame(dayjs(baseTime))
 } 
- 
-
+  
 
 /**
  * 从NPM获取包最近发布的版本信息
@@ -257,14 +257,24 @@ async function getPackageReleaseInfo(package) {
     try{
         let results = await asyncExecShellScript.call(this,`npm info ${package.name} --json`,{silent})
         const info = JSON.parse(results)
+        const distTags = info["dist-tags"]
+        // 取得最新版本的版本号，不是latest
+        let lastVersion = Object.entries(distTags).reduce((result,[tag,value])=>{
+            if(semver.gt(value, result.value)){
+                result = {tag,value}
+            }
+            return result
+        },{tag:'latest',value:info["version"]})
+
         return {
-            tags        : info["dist-tags"], 
-            license     : info["license"], 
-            author      : info["author"],
-            version     : info["version"],
-            firstCreated: info.time["created"],
-            lastPublish : info.time["modified"],
-            size        : info.dist["unpackedSize"] 
+            tags         : distTags, 
+            license      : info["license"], 
+            author       : info["author"],
+            version      : `${lastVersion.value}-${lastVersion.tag}`,
+            latestVersion: info["version"],
+            firstCreated : info.time["created"],
+            lastPublish  : info.time["modified"],
+            size         : info.dist["unpackedSize"] 
         }
     }catch(e){
         log(`ERROR: 执行npm info ${package.name}出错: ${e.stack}`)

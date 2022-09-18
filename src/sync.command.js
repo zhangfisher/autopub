@@ -28,16 +28,18 @@ const { getPackageReleaseInfo,getPackageJson,shortDate } = require('./utils')
         tasks.add(`同步[${package.name}]`)
         try{
             // 1. 从NPM上读取已发布的包信息
-            let releaseInfo = await getPackageReleaseInfo.call(this,package)
-            if(releaseInfo){
-                let packageData = getPackageJson(path.join(workspaceRoot,"packages",dirName)) 
-                packageData.lastPublish =  releaseInfo.lastPublish      
-                if(packageData.version !=  releaseInfo.version ){
-                    packageData.version =  releaseInfo.version    
+            let lastReleaseInfo = await getPackageReleaseInfo.call(this,package)
+            if(lastReleaseInfo){
+                let packageData = getPackageJson(path.join(workspaceRoot,"packages",package.dirName)) 
+                packageData.lastPublish =  lastReleaseInfo.lastPublish      
+                if(packageData.version !=  lastReleaseInfo.version ){
+                    packageData.version =  lastReleaseInfo.version
+                    let i = packageData.version.indexOf("-")
+                    if(i > -1) packageData.version = packageData.version.substring(0,i)
                     // 更新本地文件
                     fs.writeJSONSync(path.join(package.fullPath,"package.json"),packageData,{spaces:4})
                 }        
-                tasks.complete(`${shortDate(package.lastPublish)}(v${packageData.version})`)          
+                tasks.complete(`${shortDate(package.lastPublish)}(v${lastReleaseInfo.version})`)          
             }else{
                 tasks.skip("不存在")
             }            
@@ -58,7 +60,7 @@ program
         }catch(e){
             context.log(e.stack)
         }finally{
-            context.end()
+            await context.end()
         }
     })
 

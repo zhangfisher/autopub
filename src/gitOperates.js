@@ -12,14 +12,19 @@ const path = require("path")
 
 /**
  * 返回自relTime以来提交的次数
+ * 
+ * 默认会排除发布成功时的自动提交
+ * 
  * @param {*} package   {name,dirName,fullpath,}
  * @param {*} fromTime   标准时间格式
  * @returns 
  */
  async function getPackageNewCommits(package,fromTime){
-    const { silent } = this
-    const excludePackageJson = `":(exclude)${path.join(package.fullPath,'package.json')}"`
-    const gitCmd = `git shortlog HEAD ${fromTime ? '--after={'+fromTime+'}': ''} -s -- ${package.fullPath} ${excludePackageJson}`
+    const { silent,log } = this
+    //const excludePackageJson = `":(exclude)${path.join(package.fullPath,'package.json')}"`
+    //const gitCmd = `git shortlog HEAD ${fromTime ? '--after={'+fromTime+'}': ''} -s -- ${package.fullPath} ${excludePackageJson}`
+    // 当自动发布完成时会自动进行一次提交，其commit message = `autopub release....`
+    const gitCmd = `git shortlog HEAD ${fromTime ? '--after={'+fromTime+'}': ''} -s --grep "autopub release" --invert-grep -- ${package.fullPath} `
     let count = 0
     shelljs.cd(package.fullPath)
     try{
