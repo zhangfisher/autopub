@@ -1,7 +1,5 @@
 # 概述
 
-!> 测试阶段，谨慎入坑！！！
-
 `AutoPub`是一个让你爽到起飞的`pnpm/monorepo`工程一健自动发包工具。
 
 本工具是在开发[VoerkaI18n](https://zhangfisher.github.io/voerka-i18n/)解决方案（非常不错的多语言解决方案）时的副产品，`voerkai18n`是一个标准的`monorepo`工程，包含了`@voerkai18n/cli`、`@voerkai18n/runtime`、`@voerkai18n/utils`、`@voerkai18n/vue`、`@voerkai18n/vite`、`@voerkai18n/babel`、`@voerkai18n/react`、`@voerkai18n/formatters`等多个包，发布包时容易引起混乱问题，主要问题：
