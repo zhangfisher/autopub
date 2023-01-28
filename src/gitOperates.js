@@ -62,8 +62,10 @@ function recoveryFileToLatest(file){
 }
 
 function commitFiles(files=[],message){
+    const { log } = this
     if(files.length==0) return
-    return  execShellScriptWithReturns.call(this,`git commit ${files.join(" ")} -m '${message}'`)
+    log("Commit files:"+files.join(","))
+    return  execShellScriptWithReturns.call(this,`git commit ${files.map(f=>`"${f}"`).join(" ")} -m '${message}'`)
 }
 
 function addGitTag(tag,message){

@@ -78,20 +78,17 @@ function switchToReleaseBranch(){
  * 由于各包采用的是不同的版本号，所有在工作区开发分支上打上dist-tag,但是不包括版本号
  */
 async function commitChanges(publishedPackages){
-    const { workspaceRoot,distTag,autoGitTag,debug } = this    
+    const { workspaceRoot,distTag,autoGitTag,debug,log} = this    
     if(publishedPackages.length==0) return 
     // 1. 提交改变
     const pkgFiles = publishedPackages.map(package=>path.join(package.fullPath,"package.json"))
     const pubMessages = publishedPackages.map(package=>{
-        `${package.name}: v${package.version}${distTag ? '-' + distTag : ''}`
+       return `${package.name}: v${package.version}${distTag ? '-' + distTag : ''}`
     })
     const commitCommand = `autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`
+    log(`Commit: ${commitCommand}`)    
     const commitResults= commitFiles.call(this,pkgFiles,`autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`)
-    if(debug){
-        console.debug(`Commit: ${commitCommand}`)
-        console.debug(`Commit Results: ${commitResults}`)
-    }
-
+    log(`Commit Results: ${commitResults}`)
     // 2. 打上标签
     if(autoGitTag){
         const gitTag = `${publishedPackages[0].name}-v${publishedPackages[0].version}${distTag ? '-'+distTag : ''}`
