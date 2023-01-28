@@ -83,9 +83,9 @@ async function commitChanges(publishedPackages){
     // 1. 提交改变
     const pkgFiles = publishedPackages.map(package=>path.join(package.fullPath,"package.json"))
     const pubMessages = publishedPackages.map(package=>{
-       return `${package.name}: v${package.version}${distTag ? '-' + distTag : ''}`
+       return `${package.name}(v${package.version}${distTag ? '-' + distTag : ''})`
     })
-    const commitCommand = `autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`
+    const commitCommand = `autopub release: ${publishedPackages.length>1 ? ',' :'' }${pubMessages.join(",")}`
     const commitResults= commitLastChange.call(this,`autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`)
     log(`commit -a -m "${commitCommand}"> : ${commitResults}`)
     // 2. 打上标签

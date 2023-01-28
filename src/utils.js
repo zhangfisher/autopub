@@ -189,7 +189,7 @@ async function asyncExecShellScript(script,options={}){
   */
 function execShellScriptWithReturns(script,options={}){
     let { silent,log } = this
-    const result = shelljs.exec(script,{silent:false,...options}).stdout.trim()
+    const result = shelljs.exec(script,{silent,...options}).stdout.trim()
     log(`执行<${script}>：${result}`)
     return result
 }
