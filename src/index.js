@@ -86,9 +86,8 @@ async function commitChanges(publishedPackages){
        return `${package.name}: v${package.version}${distTag ? '-' + distTag : ''}`
     })
     const commitCommand = `autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`
-    log(`Commit: ${commitCommand}`)    
     const commitResults= commitFiles.call(this,pkgFiles,`autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`)
-    log(`Commit Results: ${commitResults}`)
+    log(`Commit <${commitCommand}> : ${commitResults}`)
     // 2. 打上标签
     if(autoGitTag){
         const gitTag = `${publishedPackages[0].name}-v${publishedPackages[0].version}${distTag ? '-'+distTag : ''}`
@@ -387,5 +386,4 @@ program
      })
 
  program.parseAsync(process.argv);
- 
  
