@@ -68,9 +68,13 @@ function commitFiles(files=[],message){
     return  execShellScriptWithReturns.call(this,`git commit ${files.map(f=>`"${f}"`).join(" ")} -m '${message}'`)
 }
 
-function addGitTag(tag,message){
-    return execShellScriptWithReturns.call(this,`git git -a ${tag} -m '{message}'`)
+function commitLastChange(message){
+    if(files.length==0) return
+    return  execShellScriptWithReturns.call(this,`git commit -a -m '${message}'`)
+}
 
+function addGitTag(tag,message){
+    return execShellScriptWithReturns.call(this,`git -a ${tag} -m '{message}'`)
 }
 
 module.exports = {
@@ -79,5 +83,6 @@ module.exports = {
     getCurrentBranch,
     recoveryFileToLatest,
     commitFiles,
-    addGitTag
+    addGitTag,
+    commitLastChange
 }

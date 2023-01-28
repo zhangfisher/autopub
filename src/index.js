@@ -26,7 +26,7 @@ const logger                  = require("logsets");
 const dayjs                   = require("dayjs")
 const { Command ,Option}      = require('commander');
 const { getWorkspaceContext,getPackages } = require('./context')
-const { checkoutBranch, getCurrentBranch,recoveryFileToLatest,commitFiles,addGitTag } = require("./gitOperates");
+const { checkoutBranch, getCurrentBranch,recoveryFileToLatest,addGitTag,commitLastChange} = require("./gitOperates");
 const { 
     getPackageJson,
     getPackageRootFolder,
@@ -86,15 +86,12 @@ async function commitChanges(publishedPackages){
        return `${package.name}: v${package.version}${distTag ? '-' + distTag : ''}`
     })
     const commitCommand = `autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`
-    const commitResults= commitFiles.call(this,pkgFiles,`autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`)
-    log(`Commit <${commitCommand}> : ${commitResults}`)
+    const commitResults= commitLastChange.call(this,`autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`)
+    log(`commit -a -m "${commitCommand}"> : ${commitResults}`)
     // 2. 打上标签
     if(autoGitTag){
         const gitTag = `${publishedPackages[0].name}-v${publishedPackages[0].version}${distTag ? '-'+distTag : ''}`
         addGitTag.call(this,gitTag,pubMessages)
-        if(debug){
-            console.debug()
-        }
     }
 }
 
