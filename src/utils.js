@@ -299,6 +299,7 @@ async function getPackageReleaseInfo(package) {
  * @param {*} package  {name,dirName,fullpath,modifiedTime} 
  */
 async function packageIsDirty(package){ 
+    const { getPackageNewCommits } = require("./gitOperates")
     return await getPackageNewCommits.call(this,package,package.lastPublish) > 0
 }
 
