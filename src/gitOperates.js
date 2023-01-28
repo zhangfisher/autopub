@@ -69,11 +69,11 @@ function commitFiles(files=[],message){
 }
 
 function commitLastChange(message){
-    return  execShellScriptWithReturns.call(this,`git commit -a -m '${message}'`)
+    return  execShellScriptWithReturns.call(this,`git commit -a -m "${message}"`)
 }
 
 function addGitTag(tag,message){
-    return execShellScriptWithReturns.call(this,`git -a ${tag} -m '{message}'`)
+    return execShellScriptWithReturns.call(this,`git -a ${tag} -m "{message}"`)
 }
 
 module.exports = {
