@@ -168,7 +168,7 @@ function execShellScript(script,options={}){
  * @returns 
  */
 async function asyncExecShellScript(script,options={}){
-    const { silent=true,log,debug} = this
+    const { silent=true,log} = this
     log(`Run Script: ${script}`)
     return new Promise((resolve,reject)=>{
         shelljs.exec(script,{silent,...options,async:true},(code,stdout)=>{
@@ -188,7 +188,7 @@ async function asyncExecShellScript(script,options={}){
   * @param {*} script 
   */
 function execShellScriptWithReturns(script,options={}){
-    let { silent } = this
+    let { silent,log } = this
     const result = shelljs.exec(script,{silent,...options}).stdout.trim()
     log(`执行<${script}>：result`)
     return result
