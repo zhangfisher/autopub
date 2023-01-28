@@ -69,7 +69,6 @@ function commitFiles(files=[],message){
 }
 
 function commitLastChange(message){
-    if(files.length==0) return
     return  execShellScriptWithReturns.call(this,`git commit -a -m '${message}'`)
 }
 
