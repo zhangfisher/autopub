@@ -81,7 +81,7 @@ async function commitChanges(publishedPackages){
     const { workspaceRoot,distTag,autoGitTag,debug } = this    
     if(publishedPackages.length==0) return 
     // 1. 提交改变
-    const pkgFiles = publishedPackages.map(pakcage=>path.join(package.fullPath,"package.json"))
+    const pkgFiles = publishedPackages.map(package=>path.join(package.fullPath,"package.json"))
     const pubMessages = publishedPackages.map(package=>{
         `${package.name}: v${package.version}${distTag ? '-' + distTag : ''}`
     })

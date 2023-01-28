@@ -153,9 +153,12 @@ function assertInPackageRoot(){
   * @param {*} script 
   */
 function execShellScript(script,options={}){
-    let {code,stdout} = shelljs.exec(script,options)
+    let {log,code,stdout} = shelljs.exec(script,options)
+    log(`Run Script: ${script}`)
     if(code>0){
-        new Error(`执行<${script}>失败: ${stdout.trim()}`)
+        const result = `执行<${script}>失败: ${stdout.trim()}`
+        log(result)
+        new Error(result)
     }
 }
 /**
