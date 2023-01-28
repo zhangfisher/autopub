@@ -165,12 +165,15 @@ function execShellScript(script,options={}){
  * @returns 
  */
 async function asyncExecShellScript(script,options={}){
-    const { silent=true,log} = this
+    const { silent=true,log,debug} = this
     log(`Run Script: ${script}`)
     return new Promise((resolve,reject)=>{
         shelljs.exec(script,{silent,...options,async:true},(code,stdout)=>{
             if(code>0){
-                reject(new Error(`执行<${script}>失败: ${stdout.trim()}`))
+                const info = `执行<${script}>失败: ${stdout.trim()}`
+                log(info)
+                console.error(info)
+                reject(new Error(info))
             }else{
                 resolve(stdout.trim())
             }
@@ -183,7 +186,9 @@ async function asyncExecShellScript(script,options={}){
   */
 function execShellScriptWithReturns(script,options={}){
     let { silent } = this
-    return shelljs.exec(script,{silent,...options}).stdout.trim()
+    const result = shelljs.exec(script,{silent,...options}).stdout.trim()
+    log(`执行<${script}>：result`)
+    return result
 }
 
 /** 

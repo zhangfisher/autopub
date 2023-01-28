@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  *    用于基于pnpm的多包自动发布工具
  *    
@@ -77,19 +78,27 @@ function switchToReleaseBranch(){
  * 由于各包采用的是不同的版本号，所有在工作区开发分支上打上dist-tag,但是不包括版本号
  */
 async function commitChanges(publishedPackages){
-    const { workspaceRoot,distTag,autoGitTag } = this    
+    const { workspaceRoot,distTag,autoGitTag,debug } = this    
     if(publishedPackages.length==0) return 
     // 1. 提交改变
     const pkgFiles = publishedPackages.map(pakcage=>path.join(package.fullPath,"package.json"))
     const pubMessages = publishedPackages.map(package=>{
         `${package.name}: v${package.version}${distTag ? '-' + distTag : ''}`
     })
-    
-    commitFiles.call(this,pkgFiles,`autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`)
+    const commitCommand = `autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`
+    const commitResults= commitFiles.call(this,pkgFiles,`autopub release: ${publishedPackages.length>1 ? '\n' :'' }${pubMessages.join("\n")}`)
+    if(debug){
+        console.debug(`Commit: ${commitCommand}`)
+        console.debug(`Commit Results: ${commitResults}`)
+    }
 
     // 2. 打上标签
     if(autoGitTag){
-        addGitTag.call(this,`${publishedPackages[0].name}-v${publishedPackages[0].version}${distTag ? '-'+distTag : ''}`,pubMessages)
+        const gitTag = `${publishedPackages[0].name}-v${publishedPackages[0].version}${distTag ? '-'+distTag : ''}`
+        addGitTag.call(this,gitTag,pubMessages)
+        if(debug){
+            console.debug()
+        }
     }
 }
 
