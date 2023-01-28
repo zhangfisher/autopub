@@ -1,6 +1,6 @@
 {
     "name": "autopub",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "description": "Auto publish tool for pnpm/monorepo",
     "main": "./src/index.js",
     "repository": "https://gitee.com/zhangfisher/autopub.git",
