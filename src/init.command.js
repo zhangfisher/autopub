@@ -7,7 +7,7 @@ program
     .description("注入必要的发包脚本命令")
     .option("-e, --excludes [...name]", "排除不发布的包列表",[])
     .option("-s, --build-script <name>", "包构建脚本名称","build")
-    .action(options => {
+    .action(async (options) => {
         const { workspaceRoot } = context = getWorkspaceContext(options)
         try{
             const tasks = logger.tasklist("注入发布脚本")
