@@ -20,7 +20,7 @@
 
 一般建议安装在全局，也可以安装在当前工作区。
 
-```javascript
+```shell
 > pnpm add -g autopub
 > npm install -g autopub
 > yarn global add autopub
@@ -60,6 +60,7 @@
 一键发布自最近一次发包以来有修改过的包,不需要人工介入,整个过程全自动完成，这是平时享受发包快感的主要来源。
 
 在开发`VoerkaI18n`时，当修改了源码，提交了N次后，需要发包时，就来一发，那爽劲不可描述。
+
 ```javascript
 > pnpm publish:auto
 ```
@@ -80,6 +81,62 @@
 ```
 
 # 指南
+
+## 工作机制
+
+`autpub`主要用于基于`pnpm`的`monorepo`工程的自动发布，`autpub`的基本原理非常简单，就是**自动找出当前工程下的自上次发布以后有更新的包（有过Git提交）进行自动构建并发布。**
+
+`autpub`工作流程如下：
+
+- **第一步：找出当前工程需要发布的包** 
+
+扫描整个工程（主要是`packages`)下的所有工程（包括其子目录的）信息，过滤掉`<package.json>.private=true`的包。
+
+- **第二步：检查包自上次发布以来是否有更新**
+
+1. 首先需要读取工程最近发布一次发布的时间   
+    - 读取`<package.json>.lastPublish`字段，每次成功发布时均会在`<package.json>.lastPublish`记录发布时间。
+    - 如果`lastPublish`为空，则说明没有进行过发布，此时应则执行`npm info <包名>`，从`npm`中读取该包的发布时间。
+
+2.  接下来，获取包自上次发布以来的的Git提交次数
+    -  `autopub`每次成功发布后，由于会通过`npm version`命令更新版本号，从而导致`package.json`变更。因此，`autopub`会在每次成功发布后，再自动进行一次`git commit -a -m "autopub release: <发布的包信息>"`。
+    这样，**在当前`git`仓库的`commit`记录中就会存一条`message="autopub release: <发布的包信息>"`的`commit`记录，这是重点！！！**
+    - 基于此，通过执行`git shortlog HEAD --after=<最后发布时间> -s --grep "autopub release" --invert-grep -- <包路径>`命令就可以得到包自上次发布以来的的Git提交次数。
+
+3. 根据以上获取的提交次数就可以知道自上次发布以来包是否有过更新。
+
+- **第三步：依次发布包**
+
+至此机制，`autopub`就可以筛选出当前`monorepo`工程下自上次发布以来有更新的包清单。
+接下来就可以依次对有更新的包进行发布了。
+
+**`autopub`发布包的流程如下：**
+
+1. **自增版本号**
+
+发包前第一步执行`npm version  <major | minor | patch | premajor | preminor | prepatch | prerelease>`自动增加版本号。版本号的增长方式默认是`patch`
+
+2. **构建包**
+
+一般发布前需要进行`build`。事实上`autopub`不会进行构建，只是调用当前包的`build`脚本命令。
+因此，您需要在当前`<package.json>.scripts`下定义一个名称为`build`的构建命令即可。 
+
+3. **开始发布**
+
+然后就开始执行`pnpm publish`发布命令。
+
+4. **更新发布时间**
+
+当发布成功后，就在当前包的`<package.json>.lastPublish`记录下当前时间，这个时间就是下次进行发布时需要使用的关键。
+
+5. **提交发布信息**
+
+由于上述发布过程中执行`npm version`命令和修改`<package.json>.lastPublish`会导致`package.json`文件被修改，因此我们需要将此修改也提交到`Git`仓库。
+
+**重点来了！！** 此提交不是简单地执行`git commit`命令，而是执行约定的`git commit -a -m "autopub release: <发布的包信息>"`命令，形式如`autopub release: @voerkai18n/formatters(v1.0.26)`。
+当下次发布时，就是通过查找最近发布时间以下的提交历史信息中的`autopub release`信息来定位和检索提交次数。 
+
+所以，每次完整的发布均会在Git提交历史中提交一条`git commit -a -m "autopub release: <发布的包信息>"`，通过`git log`命令就可以完整地列出发布历史。
 
 ## 全自动发包
 
@@ -127,10 +184,19 @@
     }
 }
 ```
+
+## 发布前构建
+
+`autopub`发布前会自动调用当前包`<package.json>.scripts`中的`build`脚本进行构建。 
+
+如果发布前不需要执行构建，则可以添加`--no-build`参数，如`autopub --no-build`
+
 ## 模拟发布
 
 启用`--test`参数可以进行模拟发布，该参数会导致走完整个发包流程，但是没有实际发布到`NPM`。
 该参数主要用于测试。
+
+`--test`参数本质上是在执行`pnpm publish`时添加`--dry-run`参数。
 
 ## 排除要发布的包
 
@@ -205,7 +271,7 @@
 {
     "autopub":{
         "report": "versions.md",           // 发包报告,支持md和json两种格式
-        "excludes":["utils","apps"],       // 可选的，指定排除某些包
+        "excludes":["utils","apps"],       // 可选的，指定排除某些包，使用private=true也可以
         "versionIncStep": "patch",         // 默认版本增长方式
         "releaseBranch": "",               // 发布分支
         "distTag":""                       // 发布标签

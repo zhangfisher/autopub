@@ -153,9 +153,12 @@ function assertInPackageRoot(){
   * @param {*} script 
   */
 function execShellScript(script,options={}){
-    let {code,stdout} = shelljs.exec(script,options)
+    let {log,code,stdout} = shelljs.exec(script,options)
+    log(`Run Script: ${script}`)
     if(code>0){
-        new Error(`执行<${script}>失败: ${stdout.trim()}`)
+        const result = `执行<${script}>失败: ${stdout.trim()}`
+        log(result)
+        new Error(result)
     }
 }
 /**
@@ -170,7 +173,10 @@ async function asyncExecShellScript(script,options={}){
     return new Promise((resolve,reject)=>{
         shelljs.exec(script,{silent,...options,async:true},(code,stdout)=>{
             if(code>0){
-                reject(new Error(`执行<${script}>失败: ${stdout.trim()}`))
+                const info = `执行<${script}>失败: ${stdout.trim()}`
+                log(info)
+                console.error(info)
+                reject(new Error(info))
             }else{
                 resolve(stdout.trim())
             }
@@ -182,8 +188,10 @@ async function asyncExecShellScript(script,options={}){
   * @param {*} script 
   */
 function execShellScriptWithReturns(script,options={}){
-    let { silent } = this
-    return shelljs.exec(script,{silent,...options}).stdout.trim()
+    let { silent,log } = this
+    const result = shelljs.exec(script,{silent,...options}).stdout.trim()
+    log(`执行<${script}>：${result}`)
+    return result
 }
 
 /** 
@@ -291,6 +299,7 @@ async function getPackageReleaseInfo(package) {
  * @param {*} package  {name,dirName,fullpath,modifiedTime} 
  */
 async function packageIsDirty(package){ 
+    const { getPackageNewCommits } = require("./gitOperates")
     return await getPackageNewCommits.call(this,package,package.lastPublish) > 0
 }
 
