@@ -1,10 +1,6 @@
 {
-    "name": "autopub",
-<<<<<<< HEAD
-    "version": "1.0.2",
-=======
-    "version": "1.0.13",
->>>>>>> aa2dd42a5e93dd996e17f2424af0adaf52764bb5
+    "name": "autopub", 
+    "version": "1.0.13", 
     "description": "Auto publish tool for pnpm/monorepo",
     "main": "./src/index.js",
     "repository": "https://gitee.com/zhangfisher/autopub.git",
@@ -14,12 +10,8 @@
     },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "dev:docs": "docsify serve docs",
-<<<<<<< HEAD
+        "dev:docs": "docsify serve docs", 
         "release": "npm version patch & npm publish"
-=======
-        "release": "npm version patch && npm publish"
->>>>>>> aa2dd42a5e93dd996e17f2424af0adaf52764bb5
     },
     "keywords": [],
     "author": "",
