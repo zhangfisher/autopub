@@ -9,7 +9,7 @@ importers:
       enquirer: ^2.3.6
       fast-glob: ^3.2.11
       fs-extra: ^10.1.0
-      logsets: ^1.0.19
+      logsets: ^1.0.42
       semver: ^7.3.7
       shelljs: ^0.8.5
       yalc: 1.0.0-pre.53
@@ -19,7 +19,7 @@ importers:
       enquirer: 2.3.6
       fast-glob: 3.2.11
       fs-extra: 10.1.0
-      logsets: 1.0.19
+      logsets: 1.0.42
       semver: 7.3.7
       shelljs: 0.8.5
     devDependencies:
@@ -151,11 +151,6 @@ packages:
     resolution: {integrity: sha512-CAdX5Q3YW3Gclyo5Vpqkgpj8fSdLQcRuzfX6mC6Phy0nfJ0eGYOeS7m4mt2plDWLAtA4TqTakvbboHvUxfe4iA==}
     dev: false
 
-  /deepmerge/4.2.2:
-    resolution: {integrity: sha512-FJ3UgI4gIl+PHZm53knsuSFpE+nESMr7M4v9QcgB7S63Kj/6WqMiFQJpBBYz1Pt+66bZpP3Q7Lye0Oo9MPKEdg==}
-    engines: {node: '>=0.10.0'}
-    dev: false
-
   /detect-indent/6.1.0:
     resolution: {integrity: sha512-reYkTUJAZb9gUuZ2RvVCNhVHdg62RHnJ7WJl8ftMi4diZ6NWlciOzQN88pUhSELEwflJht4oQDv0F0BMlwaYtA==}
     engines: {node: '>=8'}
@@ -201,11 +196,27 @@ packages:
       to-regex-range: 5.0.1
     dev: false
 
+  /flex-tools/1.0.65:
+    resolution: {integrity: sha512-Yliq5N7hVPI/+jY29PnQQ7BPoNDX6gkg8rq6RBAdO86dZUvPa+DoQyIIzhrVO1MgYaw/T9OtiAEsVgOtWE0r2w==}
+    dependencies:
+      fs-extra: 11.1.1
+      shelljs: 0.8.5
+    dev: false
+
   /fs-extra/10.1.0:
     resolution: {integrity: sha512-oRXApq54ETRj4eMiFzGnHWGy+zo5raudjuxN0b8H7s/RU2oW0Wvsx9O0ACRN/kRq9E8Vu/ReskGB5o3ji+FzHQ==}
     engines: {node: '>=12'}
     dependencies:
       graceful-fs: 4.2.10
+      jsonfile: 6.1.0
+      universalify: 2.0.0
+    dev: false
+
+  /fs-extra/11.1.1:
+    resolution: {integrity: sha512-MGIE4HOvQCeUCzmlHs0vXpih4ysz4wg9qiSAu6cd42lVwPbTM1TjV7RusoyQqMmk/95gdQZX72u+YW+c3eEpFQ==}
+    engines: {node: '>=14.14'}
+    dependencies:
+      graceful-fs: 4.2.11
       jsonfile: 6.1.0
       universalify: 2.0.0
     dev: false
@@ -250,6 +261,10 @@ packages:
 
   /graceful-fs/4.2.10:
     resolution: {integrity: sha512-9ByhssR2fPVsNZj478qUUbKfmL0+t5BDVyjShtyZZLiK7ZDAArFFfopyOTj0M05wE2tJPisA4iTnnXl2YoPvOA==}
+
+  /graceful-fs/4.2.11:
+    resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+    dev: false
 
   /has-flag/4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
@@ -335,13 +350,13 @@ packages:
       graceful-fs: 4.2.10
     dev: false
 
-  /logsets/1.0.19:
-    resolution: {integrity: sha512-y9wb62Euve7UBr1ZJ841DCYFm+44RRD/9Srka9adG4DlIaPRBa/QDn3lCi/odTddstStRquijcG/UyZRuIObkg==}
+  /logsets/1.0.42:
+    resolution: {integrity: sha512-utk1XPItyFgBKGVzONeYbfQP4fNf1OPwm/Jgr+rgIOo5eUh0uVMp/OTlVNGFaPEDsoXsmdS3VylSYRfugligDg==}
     dependencies:
       '@babel/runtime-corejs3': 7.18.9
       ansicolor: 1.1.100
       core-js: 3.25.0
-      deepmerge: 4.2.2
+      flex-tools: 1.0.65
     dev: false
 
   /lru-cache/6.0.0:

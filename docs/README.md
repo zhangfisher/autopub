@@ -12,6 +12,12 @@
  
 有了`AutoPub`，发布时，只需要执行`pnpm autopub`，妈妈再也不担心我的发包了。
 
+**`voerkai18n`使用`AutoPub`进行发包的实例：**
+
+![](./voerkai18n-sample.png)
+
+
+
 # 快速入门
 
 !> 本工具在`pnpm/monorepo`环境下测试通过，不适用于`lerna/yarn`等`monorepo`工程。
